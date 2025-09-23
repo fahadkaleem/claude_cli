@@ -1,40 +1,30 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import Gradient from 'ink-gradient';
-import { claudeAsciiLogo, claudeShortLogo, claudeTinyLogo } from './AsciiArt';
 
 interface HeaderProps {
   version?: string;
 }
 
-const getAsciiArtWidth = (art: string): number => {
-  const lines = art.split('\n').filter(line => line.length > 0);
-  return Math.max(...lines.map(line => line.length));
-};
-
-export const AppHeader: React.FC<HeaderProps> = ({ version = '1.0.0' }) => {
-  const terminalWidth = process.stdout.columns || 80;
-
-  let displayLogo: string;
-  const widthOfFullLogo = getAsciiArtWidth(claudeAsciiLogo);
-  const widthOfShortLogo = getAsciiArtWidth(claudeShortLogo);
-
-  if (terminalWidth >= widthOfFullLogo) {
-    displayLogo = claudeAsciiLogo;
-  } else if (terminalWidth >= widthOfShortLogo) {
-    displayLogo = claudeShortLogo;
-  } else {
-    displayLogo = claudeTinyLogo;
-  }
+export const AppHeader: React.FC<HeaderProps> = () => {
+  const cwd = process.cwd();
 
   return (
-    <Box flexDirection="column" marginBottom={1}>
-      <Gradient colors={['#E76F51', '#F4A261', '#FFFFFF']}>
-        <Text>{displayLogo}</Text>
-      </Gradient>
-      <Box justifyContent="flex-end">
-        <Text color="gray" dimColor>v{version}</Text>
+    <Box
+      borderStyle="round"
+      borderColor="gray"
+      paddingX={1}
+      paddingY={0}
+      marginBottom={1}
+      flexDirection="column"
+    >
+      <Box>
+        <Text color="yellow">✻</Text>
+        <Text> Welcome to Claude CLI!</Text>
       </Box>
+      <Text> </Text>
+      <Text color="gray">  /exit to quit the application</Text>
+      <Text> </Text>
+      <Text color="gray">  cwd: {cwd}</Text>
     </Box>
   );
 };

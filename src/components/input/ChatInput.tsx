@@ -141,9 +141,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, isDisabled, onCl
 
   return (
     <Box flexDirection="column">
-      {/* Input box first */}
-      <Box borderStyle="single" paddingX={1}>
-        <Text color="cyan" bold>{'> '}</Text>
+      {/* Input box with rounded corners */}
+      <Box borderStyle="round" borderColor="gray" paddingX={1}>
+        <Text color="gray" bold>{'> '}</Text>
         {!isDisabled ? (
           <TextInput
             value={inputValue}
