@@ -1,0 +1,22 @@
+import * as dotenv from 'dotenv';
+import { Config } from '../types';
+
+// Load .env file silently
+dotenv.config({ quiet: true } as any);
+
+export const getConfig = (): Config => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+
+  if (!apiKey) {
+    throw new Error(
+      'ANTHROPIC_API_KEY not found in environment variables.\n' +
+      'Please create a .env file with your API key or set it as an environment variable.'
+    );
+  }
+
+  return {
+    apiKey,
+    model: 'claude-sonnet-4-20250514',
+    maxTokens: 4096
+  };
+};
