@@ -158,3 +158,103 @@ Ready to support:
 - Focus on our specific needs
 - Maintain simplicity where possible
 - Progressive enhancement approach
+
+## Tool System Architecture
+
+### Overview
+Implementing a modular tool system that integrates with Anthropic's function calling capabilities, allowing Claude to execute actions like fetching weather, running calculations, or interacting with external services.
+
+### Tool Components
+
+```
+src/
+├── tools/
+│   ├── core/
+│   │   ├── Tool.ts                 # Base tool class and interfaces
+│   │   ├── ToolRegistry.ts         # Tool registration and discovery
+│   │   ├── ToolExecutor.ts         # Handles tool execution
+│   │   └── types.ts                # Tool-related TypeScript types
+│   │
+│   ├── implementations/
+│   │   ├── WeatherTool.ts          # Example: Weather fetching tool
+│   │   ├── CalculatorTool.ts       # Math calculations
+│   │   └── index.ts                # Export all tools
+│   │
+│   └── ui/
+│       ├── ToolMessage.tsx         # Display tool calls in chat
+│       └── ToolResult.tsx          # Render tool results
+```
+
+### Tool Interface
+
+```typescript
+interface Tool {
+  name: string;
+  description: string;
+  input_schema: {
+    type: 'object';
+    properties: Record<string, any>;
+    required?: string[];
+  };
+  execute(params: any): Promise<ToolResult>;
+}
+
+interface ToolResult {
+  success: boolean;
+  output: any;
+  display?: {
+    type: 'text' | 'markdown' | 'json';
+    content: string;
+  };
+}
+```
+
+### Integration Flow
+
+1. **Tool Registration**: Tools register their schemas with the system
+2. **API Request**: Include tool schemas in Anthropic API calls
+3. **Tool Detection**: Parse streaming response for tool_use blocks
+4. **Tool Execution**: Execute requested tools with provided parameters
+5. **Result Display**: Show tool execution and results in chat UI
+6. **Continuation**: Send tool results back to model if needed
+
+### Example Tool: Weather
+
+The weather tool demonstrates the pattern:
+- Defines schema for city input
+- Fetches weather data from API
+- Returns formatted result
+- Displays nicely in chat UI
+
+### Implementation Phases
+
+#### Phase 1: Core Infrastructure (Current)
+- Base Tool class
+- Tool Registry
+- Basic executor
+- Weather tool example
+
+#### Phase 2: UI Integration
+- Tool message components
+- Result rendering
+- Status indicators
+
+#### Phase 3: Advanced Tools
+- Calculator tool
+- File system tool
+- Web search tool
+- Custom user tools
+
+#### Phase 4: Enhanced Features
+- Tool confirmation dialogs
+- Streaming tool output
+- Tool chaining
+- Error recovery
+
+### Benefits
+
+1. **Extensibility**: Easy to add new tools
+2. **Type Safety**: Full TypeScript support
+3. **User Control**: Optional confirmation for actions
+4. **Clean UI**: Consistent tool display in chat
+5. **Modularity**: Each tool is self-contained

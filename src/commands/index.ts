@@ -1,6 +1,6 @@
-import { exitCommand } from './exitCommand';
-import { clearCommand } from './clearCommand';
-import { SlashCommand } from './types';
+import { exitCommand } from './exitCommand.js';
+import { clearCommand } from './clearCommand.js';
+import { SlashCommand } from './types.js';
 
 // Export all commands as an array
 export const allCommands: SlashCommand[] = [
@@ -9,4 +9,4 @@ export const allCommands: SlashCommand[] = [
 ];
 
 // Re-export types for convenience
-export * from './types';
+export * from './types.js';

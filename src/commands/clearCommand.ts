@@ -1,4 +1,4 @@
-import { SlashCommand, CommandCategory } from './types';
+import { SlashCommand, CommandCategory } from './types.js';
 
 export const clearCommand: SlashCommand = {
   name: 'clear',

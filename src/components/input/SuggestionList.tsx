@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Text } from 'ink';
-import { SlashCommand } from '../../commands/types';
+import { SlashCommand } from '../../commands/types.js';
 
 interface SuggestionListProps {
   suggestions: SlashCommand[];

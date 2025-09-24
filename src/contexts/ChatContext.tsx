@@ -1,12 +1,11 @@
 import React, { createContext, useContext } from 'react';
-import { useChat } from '../hooks/useChat';
+import { useChat } from '../hooks/useChat.js';
 import { Message } from '../types';
 
 interface ChatContextValue {
   messages: Message[];
   isLoading: boolean;
   error: string | null;
-  currentStreamMessage: string;
   sendMessage: (message: string) => void;
   clearError: () => void;
   clearChat: () => void;

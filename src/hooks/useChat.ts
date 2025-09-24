@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Message, ChatState } from '../types';
-import { streamMessage } from '../services/anthropic';
+import { executeAgentLoop } from '../services/anthropic.js';
 
 export const useChat = () => {
   const [state, setState] = useState<ChatState>({
@@ -9,9 +9,7 @@ export const useChat = () => {
     error: null
   });
 
-  const [currentStreamMessage, setCurrentStreamMessage] = useState<string>('');
-
-  const sendMessage = useCallback(async (content: string) => {
+  const handleSendMessage = useCallback(async (content: string) => {
     if (!content.trim()) return;
 
     const userMessage: Message = {
@@ -20,45 +18,105 @@ export const useChat = () => {
       timestamp: new Date()
     };
 
+    // Add user message to chat
+    let currentMessages = [...state.messages, userMessage];
     setState(prev => ({
       ...prev,
-      messages: [...prev.messages, userMessage],
+      messages: currentMessages,
       isLoading: true,
       error: null
     }));
 
-    setCurrentStreamMessage('');
-
     try {
-      let fullResponse = '';
+      // Execute the agent loop with async generator
+      for await (const step of executeAgentLoop(currentMessages)) {
+        switch (step.type) {
+          case 'assistant':
+            // Add assistant message (may include pending tool calls)
+            const assistantMessage: Message = {
+              role: 'assistant',
+              content: step.content,
+              timestamp: new Date(),
+              toolCalls: step.toolCalls
+            };
 
-      await streamMessage(
-        [...state.messages, userMessage],
-        (chunk) => {
-          fullResponse += chunk;
-          setCurrentStreamMessage(fullResponse);
+            currentMessages = [...currentMessages, assistantMessage];
+            setState(prev => ({
+              ...prev,
+              messages: currentMessages,
+              isLoading: true // Still processing
+            }));
+            break;
+
+          case 'tool-executing':
+            // Update the tool call status in the last message
+            setState(prev => {
+              const updatedMessages = [...prev.messages];
+              const lastMessage = updatedMessages[updatedMessages.length - 1];
+
+              if (lastMessage?.toolCalls) {
+                const toolCall = lastMessage.toolCalls.find(tc => tc.id === step.toolCall.id);
+                if (toolCall) {
+                  toolCall.status = 'executing' as any;
+                }
+              }
+
+              return {
+                ...prev,
+                messages: updatedMessages,
+                isLoading: true
+              };
+            });
+            break;
+
+          case 'tool-complete':
+            // Update the tool call with result
+            setState(prev => {
+              const updatedMessages = [...prev.messages];
+              const lastMessage = updatedMessages[updatedMessages.length - 1];
+
+              if (lastMessage?.toolCalls) {
+                const toolCall = lastMessage.toolCalls.find(tc => tc.id === step.toolCall.id);
+                if (toolCall) {
+                  toolCall.status = step.toolCall.status;
+                  toolCall.result = step.toolCall.result;
+                }
+              }
+
+              return {
+                ...prev,
+                messages: updatedMessages,
+                isLoading: true
+              };
+            });
+            break;
+
+          case 'thinking':
+            // Just keep the loading state
+            setState(prev => ({
+              ...prev,
+              isLoading: true
+            }));
+            break;
+
+          case 'complete':
+            // Done!
+            setState(prev => ({
+              ...prev,
+              isLoading: false
+            }));
+            break;
         }
-      );
 
-      const assistantMessage: Message = {
-        role: 'assistant',
-        content: fullResponse,
-        timestamp: new Date()
-      };
-
-      setState(prev => ({
-        ...prev,
-        messages: [...prev.messages, assistantMessage],
-        isLoading: false
-      }));
-      setCurrentStreamMessage('');
+        // Small delay between steps for visual effect
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
     } catch (error) {
       setState(prev => ({
         ...prev,
         isLoading: false,
         error: error instanceof Error ? error.message : 'An error occurred'
       }));
-      setCurrentStreamMessage('');
     }
   }, [state.messages]);
 
@@ -72,15 +130,13 @@ export const useChat = () => {
       isLoading: false,
       error: null
     });
-    setCurrentStreamMessage('');
   }, []);
 
   return {
     messages: state.messages,
     isLoading: state.isLoading,
     error: state.error,
-    currentStreamMessage,
-    sendMessage,
+    sendMessage: handleSendMessage,
     clearError,
     clearChat
   };

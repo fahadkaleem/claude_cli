@@ -1,22 +1,12 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.useChat = void 0;
-const react_1 = require("react");
-const anthropic_1 = require("../services/anthropic");
-const useChat = () => {
-    const [state, setState] = (0, react_1.useState)({
-        messages: [
-            {
-                role: 'system',
-                content: 'Welcome to Claude CLI Chat! Type your message and press Ctrl+Enter to send.',
-                timestamp: new Date()
-            }
-        ],
+import { useState, useCallback } from 'react';
+import { executeAgentLoop } from '../services/anthropic.js';
+export const useChat = () => {
+    const [state, setState] = useState({
+        messages: [],
         isLoading: false,
         error: null
     });
-    const [currentStreamMessage, setCurrentStreamMessage] = (0, react_1.useState)('');
-    const sendMessage = (0, react_1.useCallback)(async (content) => {
+    const handleSendMessage = useCallback(async (content) => {
         if (!content.trim())
             return;
         const userMessage = {
@@ -24,30 +14,88 @@ const useChat = () => {
             content: content.trim(),
             timestamp: new Date()
         };
+        // Add user message to chat
+        let currentMessages = [...state.messages, userMessage];
         setState(prev => ({
             ...prev,
-            messages: [...prev.messages, userMessage],
+            messages: currentMessages,
             isLoading: true,
             error: null
         }));
-        setCurrentStreamMessage('');
         try {
-            let fullResponse = '';
-            await (0, anthropic_1.streamMessage)([...state.messages, userMessage], (chunk) => {
-                fullResponse += chunk;
-                setCurrentStreamMessage(fullResponse);
-            });
-            const assistantMessage = {
-                role: 'assistant',
-                content: fullResponse,
-                timestamp: new Date()
-            };
-            setState(prev => ({
-                ...prev,
-                messages: [...prev.messages, assistantMessage],
-                isLoading: false
-            }));
-            setCurrentStreamMessage('');
+            // Execute the agent loop with async generator
+            for await (const step of executeAgentLoop(currentMessages)) {
+                switch (step.type) {
+                    case 'assistant':
+                        // Add assistant message (may include pending tool calls)
+                        const assistantMessage = {
+                            role: 'assistant',
+                            content: step.content,
+                            timestamp: new Date(),
+                            toolCalls: step.toolCalls
+                        };
+                        currentMessages = [...currentMessages, assistantMessage];
+                        setState(prev => ({
+                            ...prev,
+                            messages: currentMessages,
+                            isLoading: true // Still processing
+                        }));
+                        break;
+                    case 'tool-executing':
+                        // Update the tool call status in the last message
+                        setState(prev => {
+                            const updatedMessages = [...prev.messages];
+                            const lastMessage = updatedMessages[updatedMessages.length - 1];
+                            if (lastMessage?.toolCalls) {
+                                const toolCall = lastMessage.toolCalls.find(tc => tc.id === step.toolCall.id);
+                                if (toolCall) {
+                                    toolCall.status = 'executing';
+                                }
+                            }
+                            return {
+                                ...prev,
+                                messages: updatedMessages,
+                                isLoading: true
+                            };
+                        });
+                        break;
+                    case 'tool-complete':
+                        // Update the tool call with result
+                        setState(prev => {
+                            const updatedMessages = [...prev.messages];
+                            const lastMessage = updatedMessages[updatedMessages.length - 1];
+                            if (lastMessage?.toolCalls) {
+                                const toolCall = lastMessage.toolCalls.find(tc => tc.id === step.toolCall.id);
+                                if (toolCall) {
+                                    toolCall.status = step.toolCall.status;
+                                    toolCall.result = step.toolCall.result;
+                                }
+                            }
+                            return {
+                                ...prev,
+                                messages: updatedMessages,
+                                isLoading: true
+                            };
+                        });
+                        break;
+                    case 'thinking':
+                        // Just keep the loading state
+                        setState(prev => ({
+                            ...prev,
+                            isLoading: true
+                        }));
+                        break;
+                    case 'complete':
+                        // Done!
+                        setState(prev => ({
+                            ...prev,
+                            isLoading: false
+                        }));
+                        break;
+                }
+                // Small delay between steps for visual effect
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
         }
         catch (error) {
             setState(prev => ({
@@ -55,35 +103,25 @@ const useChat = () => {
                 isLoading: false,
                 error: error instanceof Error ? error.message : 'An error occurred'
             }));
-            setCurrentStreamMessage('');
         }
     }, [state.messages]);
-    const clearError = (0, react_1.useCallback)(() => {
+    const clearError = useCallback(() => {
         setState(prev => ({ ...prev, error: null }));
     }, []);
-    const clearChat = (0, react_1.useCallback)(() => {
+    const clearChat = useCallback(() => {
         setState({
-            messages: [
-                {
-                    role: 'system',
-                    content: 'Chat cleared. Type your message and press Ctrl+Enter to send.',
-                    timestamp: new Date()
-                }
-            ],
+            messages: [],
             isLoading: false,
             error: null
         });
-        setCurrentStreamMessage('');
     }, []);
     return {
         messages: state.messages,
         isLoading: state.isLoading,
         error: state.error,
-        currentStreamMessage,
-        sendMessage,
+        sendMessage: handleSendMessage,
         clearError,
         clearChat
     };
 };
-exports.useChat = useChat;
 //# sourceMappingURL=useChat.js.map

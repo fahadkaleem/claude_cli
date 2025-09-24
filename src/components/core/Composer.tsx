@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box } from 'ink';
-import { ChatInput } from '../input/ChatInput';
-import { StatusBar } from '../status/StatusBar';
+import { ChatInput } from '../input/ChatInput.js';
+import { StatusBar } from '../status/StatusBar.js';
 
 interface ComposerProps {
   onSubmit: (message: string) => void;

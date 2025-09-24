@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Box, useInput } from 'ink';
-import { MainContent } from './MainContent';
-import { Composer } from './Composer';
-import { Footer } from './Footer';
-import { AppHeader } from './AppHeader';
-import { useChat } from '../../hooks/useChat';
-import { initializeClient } from '../../services/anthropic';
+import { MainContent } from './MainContent.js';
+import { Composer } from './Composer.js';
+import { Footer } from './Footer.js';
+import { AppHeader } from './AppHeader.js';
+import { useChat } from '../../hooks/useChat.js';
+import { initializeClient } from '../../services/anthropic.js';
+import { toolRegistry } from '../../tools/core/ToolRegistry.js';
+import { WeatherTool } from '../../tools/implementations/WeatherTool.js';
 
 interface AppProps {
   model?: string;
@@ -17,7 +19,6 @@ export const App: React.FC<AppProps> = ({ model }) => {
     messages,
     isLoading,
     error,
-    currentStreamMessage,
     sendMessage,
     clearError,
     clearChat
@@ -26,6 +27,10 @@ export const App: React.FC<AppProps> = ({ model }) => {
   useEffect(() => {
     try {
       initializeClient();
+
+      // Register tools
+      toolRegistry.register(new WeatherTool());
+
       setIsConnected(true);
     } catch (err) {
       setIsConnected(false);
@@ -48,7 +53,6 @@ export const App: React.FC<AppProps> = ({ model }) => {
 
       <MainContent
         messages={messages}
-        currentStreamMessage={currentStreamMessage}
         isLoading={isLoading}
       />
 

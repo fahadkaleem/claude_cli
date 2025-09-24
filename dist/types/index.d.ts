@@ -1,7 +1,9 @@
+import type { ToolCall } from '../tools/core/types.js';
 export interface Message {
     role: 'user' | 'assistant' | 'system';
     content: string;
     timestamp?: Date;
+    toolCalls?: ToolCall[];
 }
 export interface ChatState {
     messages: Message[];

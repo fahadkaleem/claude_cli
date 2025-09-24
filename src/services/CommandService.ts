@@ -1,4 +1,4 @@
-import { SlashCommand } from '../commands/types';
+import { SlashCommand } from '../commands/types.js';
 
 /**
  * Service for managing and registering slash commands

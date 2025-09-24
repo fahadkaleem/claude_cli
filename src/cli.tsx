@@ -2,7 +2,7 @@
 import React from 'react';
 import { render } from 'ink';
 import meow from 'meow';
-import { App } from './components/core/App';
+import { App } from './components/core/App.js';
 
 const cli = meow(`
   Usage

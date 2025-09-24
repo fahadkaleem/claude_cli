@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
-import { SuggestionList } from './SuggestionList';
-import { commandService } from '../../services/CommandService';
-import { registerBuiltInCommands } from '../../commands/registerCommands';
-import type { SlashCommand } from '../../commands/types';
+import { SuggestionList } from './SuggestionList.js';
+import { commandService } from '../../services/CommandService.js';
+import { registerBuiltInCommands } from '../../commands/registerCommands.js';
+import type { SlashCommand } from '../../commands/types.js';
 
 interface ChatInputProps {
   onSubmit: (value: string) => void;
@@ -81,8 +81,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, isDisabled, onCl
       const result = command.action(context, args);
 
       // Handle command result
-      if (result && result.type === 'prompt') {
-        onSubmit(result.content);
+      if (result && 'type' in result && (result as any).type === 'prompt') {
+        onSubmit((result as any).content);
       }
     }
   };
