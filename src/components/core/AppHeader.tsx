@@ -19,7 +19,7 @@ export const AppHeader: React.FC<HeaderProps> = () => {
     >
       <Box>
         <Text color="yellow">✻</Text>
-        <Text> Welcome to Claude CLI!</Text>
+        <Text> Welcome to Atlas!</Text>
       </Box>
       <Text> </Text>
       <Text color="gray">  /exit to quit the application</Text>

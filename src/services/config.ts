@@ -1,8 +1,8 @@
 import * as dotenv from 'dotenv';
 import { Config } from '../types';
 
-// Load .env file silently
-dotenv.config({ quiet: true } as any);
+// Load .env file silently (quiet option not in types but works)
+dotenv.config({ silent: true } as dotenv.DotenvConfigOptions);
 
 export const getConfig = (): Config => {
   const apiKey = process.env.ANTHROPIC_API_KEY;

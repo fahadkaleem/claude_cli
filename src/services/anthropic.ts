@@ -1,143 +1,328 @@
 import Anthropic from '@anthropic-ai/sdk';
+import type { MessageParam, ContentBlock, TextBlock, ToolUseBlock } from '@anthropic-ai/sdk/resources/messages';
 import { Message } from '../types';
 import { getConfig } from './config.js';
 import { toolRegistry } from '../tools/core/ToolRegistry.js';
 import { toolExecutor } from '../tools/core/ToolExecutor.js';
-import type { ToolCall } from '../tools/core/types.js';
+import { ToolCall, ToolStatus } from '../tools/core/types.js';
 
-let client: Anthropic | null = null;
+// Clean type definitions with proper discriminated unions
+export interface AssistantStep {
+  type: 'assistant';
+  content: string;
+  toolCalls?: ToolCall[];
+}
 
-export const initializeClient = () => {
-  if (!client) {
-    const config = getConfig();
-    client = new Anthropic({
-      apiKey: config.apiKey,
-    });
-  }
-  return client;
-};
+export interface ToolExecutingStep {
+  type: 'tool-executing';
+  toolCall: ToolCall;
+}
+
+export interface ToolCompleteStep {
+  type: 'tool-complete';
+  toolCall: ToolCall;
+}
+
+export interface ThinkingStep {
+  type: 'thinking';
+}
+
+export interface CompleteStep {
+  type: 'complete';
+}
 
 export type AgentStep =
-  | { type: 'assistant'; content: string; toolCalls?: ToolCall[] }
-  | { type: 'tool-executing'; toolCall: ToolCall }
-  | { type: 'tool-complete'; toolCall: ToolCall }
-  | { type: 'thinking' }
-  | { type: 'complete' };
+  | AssistantStep
+  | ToolExecutingStep
+  | ToolCompleteStep
+  | ThinkingStep
+  | CompleteStep;
 
-export async function* executeAgentLoop(messages: Message[]): AsyncGenerator<AgentStep> {
-  const anthropic = initializeClient();
-  const config = getConfig();
+/**
+ * Main chat service that handles message ordering and tool execution.
+ * Inspired by Gemini's clean architecture.
+ */
+export class ChatService {
+  private client: Anthropic | null = null;
 
-  // Convert our message format to Anthropic's format
-  const formattedMessages = messages
-    .filter(msg => msg.role !== 'system')
-    .map(msg => ({
-      role: msg.role as 'user' | 'assistant',
-      content: msg.content
-    }));
+  // Promise chain to ensure messages are processed in order (like Gemini)
+  private sendPromise: Promise<void> = Promise.resolve();
 
-  // Get registered tools
-  const tools = toolRegistry.getSchemas();
+  // Current conversation messages
+  private messages: Message[] = [];
 
-  // Make the initial API call
-  const response = await anthropic.messages.create({
-    model: config.model,
-    max_tokens: config.maxTokens || 4096,
-    messages: formattedMessages,
-    tools: tools.length > 0 ? tools : undefined,
-  });
+  constructor() {
+    this.initializeClient();
+  }
 
-  // Get text and tool blocks
-  const textBlocks = response.content.filter(block => block.type === 'text');
-  const toolUseBlocks = response.content.filter(block => block.type === 'tool_use');
-
-  // If there's initial text, yield it
-  if (textBlocks.length > 0) {
-    const initialText = textBlocks.map(block => block.text).join('');
-
-    // If there are also tool calls, include them but don't execute yet
-    if (toolUseBlocks.length > 0) {
-      const pendingToolCalls: ToolCall[] = toolUseBlocks.map(block => ({
-        id: block.id,
-        name: block.name,
-        input: block.input,
-        status: 'pending' as any
-      }));
-
-      yield { type: 'assistant', content: initialText, toolCalls: pendingToolCalls };
-    } else {
-      // No tools, just text
-      yield { type: 'assistant', content: initialText };
-      yield { type: 'complete' };
-      return;
+  private initializeClient(): void {
+    if (!this.client) {
+      const config = getConfig();
+      this.client = new Anthropic({ apiKey: config.apiKey });
     }
   }
 
-  // If there are tool calls, execute them one by one
-  if (toolUseBlocks.length > 0) {
-    const executedToolCalls: ToolCall[] = [];
+  /**
+   * Validates that messages alternate correctly between user and assistant
+   */
+  private validateMessages(messages: Message[]): void {
+    for (let i = 1; i < messages.length; i++) {
+      const prevRole = messages[i - 1].role;
+      const currRole = messages[i].role;
 
-    for (const toolBlock of toolUseBlocks) {
+      if (prevRole === currRole && prevRole !== 'system') {
+        throw new Error(`Invalid message sequence: consecutive ${prevRole} messages`);
+      }
+    }
+  }
+
+  /**
+   * Formats messages for the Anthropic API
+   */
+  private formatMessagesForAPI(messages: Message[]): MessageParam[] {
+    return messages
+      .filter(msg => msg.role !== 'system')
+      .map(msg => ({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content
+      }));
+  }
+
+  /**
+   * Processes tool use blocks and executes tools
+   */
+  private async* processToolCalls(
+    toolUseBlocks: ToolUseBlock[]
+  ): AsyncGenerator<ToolExecutingStep | ToolCompleteStep> {
+    for (const block of toolUseBlocks) {
       const toolCall: ToolCall = {
-        id: toolBlock.id,
-        name: toolBlock.name,
-        input: toolBlock.input,
-        status: 'executing' as any
+        id: block.id,
+        name: block.name,
+        input: block.input,
+        status: ToolStatus.Executing
       };
 
-      // Yield that we're executing this tool
+      // Yield executing status
       yield { type: 'tool-executing', toolCall };
 
       // Execute the tool
       const result = await toolExecutor.execute(toolCall.name, toolCall.input);
+
+      // Update tool call with result
       toolCall.result = result;
-      toolCall.status = result.success ? 'completed' as any : 'failed' as any;
+      toolCall.status = result.success ? ToolStatus.Completed : ToolStatus.Failed;
 
-      // Yield that the tool is complete
+      // Yield complete status
       yield { type: 'tool-complete', toolCall };
-
-      executedToolCalls.push(toolCall);
     }
+  }
 
-    // Now we're thinking about the results
-    yield { type: 'thinking' };
+  /**
+   * Builds tool result messages for the API
+   */
+  private buildToolResultMessages(toolCalls: ToolCall[]): MessageParam[] {
+    return toolCalls.map(tc => ({
+      role: 'user' as const,
+      content: [{
+        type: 'tool_result' as const,
+        tool_use_id: tc.id,
+        content: JSON.stringify(tc.result?.output || { error: tc.result?.error || 'No result' })
+      }]
+    }));
+  }
 
-    // Send tool results back to Claude
-    const messagesWithToolResults = [
-      ...formattedMessages,
-      {
-        role: 'assistant' as const,
-        content: response.content
-      },
-      ...executedToolCalls.map(tc => ({
-        role: 'user' as const,
-        content: [{
-          type: 'tool_result' as const,
-          tool_use_id: tc.id,
-          content: JSON.stringify(tc.result?.output || { error: tc.result?.error || 'No result' })
-        }]
-      }))
-    ];
+  /**
+   * Main method to send a message and handle the response.
+   * Uses promise chaining to ensure messages are processed in order.
+   */
+  async* sendMessage(content: string): AsyncGenerator<AgentStep> {
+    // Chain this send operation to ensure ordering
+    const streamGenerator = this.executeMessageFlow(content);
 
-    // Get Claude's response after processing tool results
-    const finalResponse = await anthropic.messages.create({
-      model: config.model,
-      max_tokens: config.maxTokens || 4096,
-      messages: messagesWithToolResults,
-      tools: tools.length > 0 ? tools : undefined,
+    // Use the promise chain pattern from Gemini
+    const previousPromise = this.sendPromise;
+
+    // Create a promise that will resolve when this message is done
+    let resolveSend: () => void;
+    const sendComplete = new Promise<void>(resolve => {
+      resolveSend = resolve;
     });
 
-    // Check if there are more tool calls in the response
-    const finalTextBlocks = finalResponse.content.filter(block => block.type === 'text');
-    const moreToolBlocks = finalResponse.content.filter(block => block.type === 'tool_use');
+    this.sendPromise = sendComplete;
 
-    if (finalTextBlocks.length > 0) {
-      const finalText = finalTextBlocks.map(block => block.text).join('');
-      yield { type: 'assistant', content: finalText };
+    try {
+      // Wait for previous message to complete
+      await previousPromise;
+
+      // Now process this message
+      for await (const step of streamGenerator) {
+        yield step;
+      }
+    } finally {
+      // Mark this message as complete
+      resolveSend!();
+    }
+  }
+
+  /**
+   * The actual message flow execution
+   */
+  private async* executeMessageFlow(content: string): AsyncGenerator<AgentStep> {
+    if (!this.client) {
+      throw new Error('Client not initialized');
     }
 
-    // If there are more tools, we could recurse here
-    // For now, we'll just complete
-    yield { type: 'complete' };
+    const config = getConfig();
+
+    // Add user message to conversation
+    const userMessage: Message = {
+      role: 'user',
+      content,
+      timestamp: new Date()
+    };
+
+    this.messages.push(userMessage);
+
+    try {
+      // Validate message history
+      this.validateMessages(this.messages);
+
+      // Get tool schemas
+      const tools = toolRegistry.getSchemas();
+
+      // Make initial API call
+      const response = await this.client.messages.create({
+        model: config.model,
+        max_tokens: config.maxTokens || 4096,
+        messages: this.formatMessagesForAPI(this.messages),
+        tools: tools.length > 0 ? tools : undefined,
+      });
+
+      // Process response with proper types
+      const textBlocks = response.content.filter(
+        block => block.type === 'text'
+      ) as TextBlock[];
+      const toolUseBlocks = response.content.filter(
+        block => block.type === 'tool_use'
+      ) as ToolUseBlock[];
+
+      // Get text content
+      const textContent = textBlocks.map(block => block.text).join('');
+
+      // Prepare tool calls if any
+      let pendingToolCalls: ToolCall[] | undefined;
+      if (toolUseBlocks.length > 0) {
+        pendingToolCalls = toolUseBlocks.map(block => ({
+          id: block.id,
+          name: block.name,
+          input: block.input,
+          status: ToolStatus.Pending,
+          result: undefined
+        }));
+      }
+
+      // Yield assistant response with pending tools
+      yield {
+        type: 'assistant',
+        content: textContent,
+        toolCalls: pendingToolCalls
+      };
+
+      // Add assistant message to history
+      const assistantMessage: Message = {
+        role: 'assistant',
+        content: textContent,
+        timestamp: new Date(),
+        toolCalls: pendingToolCalls
+      };
+      this.messages.push(assistantMessage);
+
+      // If there are tools to execute
+      if (toolUseBlocks.length > 0) {
+        const executedToolCalls: ToolCall[] = [];
+
+        // Process each tool
+        for await (const step of this.processToolCalls(toolUseBlocks)) {
+          yield step;
+
+          if (step.type === 'tool-complete') {
+            executedToolCalls.push(step.toolCall);
+          }
+        }
+
+        // Send tool results back to the model
+        yield { type: 'thinking' };
+
+        const followUpResponse = await this.client.messages.create({
+          model: config.model,
+          max_tokens: config.maxTokens || 4096,
+          messages: [
+            ...this.formatMessagesForAPI(this.messages),
+            {
+              role: 'assistant' as const,
+              content: response.content
+            },
+            ...this.buildToolResultMessages(executedToolCalls)
+          ],
+          tools: tools.length > 0 ? tools : undefined,
+        });
+
+        // Process follow-up response
+        const followUpTextBlocks = followUpResponse.content
+          .filter(block => block.type === 'text') as TextBlock[];
+        const followUpText = followUpTextBlocks
+          .map(block => block.text)
+          .join('');
+
+        if (followUpText) {
+          yield { type: 'assistant', content: followUpText };
+
+          // Add follow-up to history
+          this.messages.push({
+            role: 'assistant',
+            content: followUpText,
+            timestamp: new Date()
+          });
+        }
+      }
+
+      yield { type: 'complete' };
+
+    } catch (error) {
+      // Remove the user message if there was an error
+      if (this.messages[this.messages.length - 1]?.role === 'user') {
+        this.messages.pop();
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Gets the current conversation messages
+   */
+  getMessages(): Message[] {
+    return [...this.messages]; // Return a copy
+  }
+
+  /**
+   * Clears the conversation
+   */
+  clearMessages(): void {
+    this.messages = [];
+  }
+}
+
+// Singleton instance
+export const chatService = new ChatService();
+
+// Legacy function for backward compatibility
+export async function* executeAgentLoop(messages: Message[]): AsyncGenerator<AgentStep> {
+  // For now, just use the last message as the new input
+  const lastUserMessage = messages.filter(m => m.role === 'user').pop();
+
+  if (lastUserMessage) {
+    for await (const step of chatService.sendMessage(lastUserMessage.content)) {
+      yield step;
+    }
   }
 }

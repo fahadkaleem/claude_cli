@@ -5,9 +5,7 @@ import { Composer } from './Composer.js';
 import { Footer } from './Footer.js';
 import { AppHeader } from './AppHeader.js';
 import { useChat } from '../../hooks/useChat.js';
-import { initializeClient } from '../../services/anthropic.js';
-import { toolRegistry } from '../../tools/core/ToolRegistry.js';
-import { WeatherTool } from '../../tools/implementations/WeatherTool.js';
+import { toolRegistry, fetch as fetchTools } from '../../tools/index.js';
 
 interface AppProps {
   model?: string;
@@ -19,22 +17,25 @@ export const App: React.FC<AppProps> = ({ model }) => {
     messages,
     isLoading,
     error,
+    queuedMessages,
     sendMessage,
     clearError,
     clearChat
   } = useChat();
 
   useEffect(() => {
-    try {
-      initializeClient();
+    const registerTools = async () => {
+      try {
+        // Auto-register all tools from categories
+        await toolRegistry.autoRegister(fetchTools);
 
-      // Register tools
-      toolRegistry.register(new WeatherTool());
+        setIsConnected(true);
+      } catch (err) {
+        setIsConnected(false);
+      }
+    };
 
-      setIsConnected(true);
-    } catch (err) {
-      setIsConnected(false);
-    }
+    registerTools();
   }, []);
 
   useInput((input, key) => {
@@ -61,6 +62,7 @@ export const App: React.FC<AppProps> = ({ model }) => {
         isLoading={isLoading}
         error={error}
         isConnected={isConnected}
+        queuedMessages={queuedMessages}
         onClearChat={clearChat}
       />
 

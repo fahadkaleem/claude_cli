@@ -1,8 +1,10 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
+import Markdown from '@inkkit/ink-markdown';
 import { Message } from '../../types';
 import { ToolMessage } from '../../tools/ui/ToolMessage.js';
+import { MessageIndicators, Colors, DisplayType, LoadingMessages, SpinnerType } from '../../constants/ui.js';
 
 interface MessageListProps {
   messages: Message[];
@@ -18,14 +20,26 @@ export const MessageList: React.FC<MessageListProps> = ({
 
   messages.forEach((message, index) => {
     // Add the message itself
-    messageElements.push(
-      <Box key={`msg-${index}`} marginBottom={1}>
-        <Text color={message.role === 'user' ? 'cyan' : 'white'}>
-          {message.role === 'user' ? '> ' : '● '}
-          {message.content}
-        </Text>
-      </Box>
-    );
+    if (message.role === 'user') {
+      // User messages - keep as plain text with cyan color
+      messageElements.push(
+        <Box key={`msg-${index}`} marginBottom={1}>
+          <Text color={Colors.User}>
+            {MessageIndicators.User} {message.content}
+          </Text>
+        </Box>
+      );
+    } else {
+      // Assistant messages - render as markdown
+      messageElements.push(
+        <Box key={`msg-${index}`} marginBottom={1}>
+          <Text color={Colors.Assistant}>{MessageIndicators.Assistant} </Text>
+          <Box flexGrow={1}>
+            <Markdown>{message.content}</Markdown>
+          </Box>
+        </Box>
+      );
+    }
 
     // Add tool calls as separate items after the message
     if (message.toolCalls && message.toolCalls.length > 0) {
@@ -45,10 +59,10 @@ export const MessageList: React.FC<MessageListProps> = ({
 
       {isLoading && (
         <Box>
-          <Text color="green">
-            <Spinner type="dots" />
+          <Text color={Colors.Loading}>
+            <Spinner type={SpinnerType.Default} />
           </Text>
-          <Text> Thinking...</Text>
+          <Text> {LoadingMessages.Thinking}</Text>
         </Box>
       )}
     </Box>

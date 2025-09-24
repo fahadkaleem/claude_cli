@@ -1,115 +1,102 @@
 import { useState, useCallback } from 'react';
 import { Message, ChatState } from '../types';
-import { executeAgentLoop } from '../services/anthropic.js';
+import { chatService } from '../services/anthropic.js';
+import type { ToolCall } from '../tools/core/types.js';
 
 export const useChat = () => {
   const [state, setState] = useState<ChatState>({
-    messages: [],
+    messages: chatService.getMessages(),
     isLoading: false,
     error: null
   });
 
-  const handleSendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (content: string) => {
     if (!content.trim()) return;
 
-    const userMessage: Message = {
-      role: 'user',
-      content: content.trim(),
-      timestamp: new Date()
-    };
-
-    // Add user message to chat
-    let currentMessages = [...state.messages, userMessage];
+    // Set loading state
     setState(prev => ({
       ...prev,
-      messages: currentMessages,
       isLoading: true,
       error: null
     }));
 
     try {
-      // Execute the agent loop with async generator
-      for await (const step of executeAgentLoop(currentMessages)) {
+      // Process message through the chat service
+      for await (const step of chatService.sendMessage(content.trim())) {
         switch (step.type) {
-          case 'assistant':
-            // Add assistant message (may include pending tool calls)
-            const assistantMessage: Message = {
-              role: 'assistant',
-              content: step.content,
-              timestamp: new Date(),
-              toolCalls: step.toolCalls
-            };
-
-            currentMessages = [...currentMessages, assistantMessage];
+          case 'assistant': {
+            // Update messages from service (it manages the history now)
             setState(prev => ({
               ...prev,
-              messages: currentMessages,
-              isLoading: true // Still processing
+              messages: chatService.getMessages(),
+              isLoading: true // Still processing if there are tools
             }));
             break;
+          }
 
-          case 'tool-executing':
-            // Update the tool call status in the last message
+          case 'tool-executing': {
+            // Update the tool status in the UI
             setState(prev => {
-              const updatedMessages = [...prev.messages];
-              const lastMessage = updatedMessages[updatedMessages.length - 1];
+              const messages = chatService.getMessages();
+              const lastMessage = messages[messages.length - 1];
 
               if (lastMessage?.toolCalls) {
-                const toolCall = lastMessage.toolCalls.find(tc => tc.id === step.toolCall.id);
-                if (toolCall) {
-                  toolCall.status = 'executing' as any;
-                }
-              }
-
-              return {
-                ...prev,
-                messages: updatedMessages,
-                isLoading: true
-              };
-            });
-            break;
-
-          case 'tool-complete':
-            // Update the tool call with result
-            setState(prev => {
-              const updatedMessages = [...prev.messages];
-              const lastMessage = updatedMessages[updatedMessages.length - 1];
-
-              if (lastMessage?.toolCalls) {
-                const toolCall = lastMessage.toolCalls.find(tc => tc.id === step.toolCall.id);
+                const toolCall = lastMessage.toolCalls.find(
+                  tc => tc.id === step.toolCall.id
+                );
                 if (toolCall) {
                   toolCall.status = step.toolCall.status;
-                  toolCall.result = step.toolCall.result;
                 }
               }
 
               return {
                 ...prev,
-                messages: updatedMessages,
+                messages: [...messages], // Force re-render
                 isLoading: true
               };
             });
             break;
+          }
 
-          case 'thinking':
-            // Just keep the loading state
-            setState(prev => ({
-              ...prev,
-              isLoading: true
-            }));
+          case 'tool-complete': {
+            // Update tool with result
+            setState(prev => {
+              const messages = chatService.getMessages();
+              const lastMessage = messages[messages.length - 1];
+
+              if (lastMessage?.toolCalls) {
+                const toolCall = lastMessage.toolCalls.find(
+                  tc => tc.id === step.toolCall.id
+                );
+                if (toolCall) {
+                  Object.assign(toolCall, step.toolCall);
+                }
+              }
+
+              return {
+                ...prev,
+                messages: [...messages], // Force re-render
+                isLoading: true
+              };
+            });
             break;
+          }
 
-          case 'complete':
-            // Done!
+          case 'thinking': {
+            // Just keep loading state
+            break;
+          }
+
+          case 'complete': {
+            // Final state update
             setState(prev => ({
               ...prev,
+              messages: chatService.getMessages(),
               isLoading: false
             }));
             break;
+          }
         }
-
-        // Small delay between steps for visual effect
-        await new Promise(resolve => setTimeout(resolve, 50));
       }
     } catch (error) {
       setState(prev => ({
@@ -118,13 +105,14 @@ export const useChat = () => {
         error: error instanceof Error ? error.message : 'An error occurred'
       }));
     }
-  }, [state.messages]);
+  }, []);
 
   const clearError = useCallback(() => {
     setState(prev => ({ ...prev, error: null }));
   }, []);
 
   const clearChat = useCallback(() => {
+    chatService.clearMessages();
     setState({
       messages: [],
       isLoading: false,
@@ -136,7 +124,7 @@ export const useChat = () => {
     messages: state.messages,
     isLoading: state.isLoading,
     error: state.error,
-    sendMessage: handleSendMessage,
+    sendMessage,
     clearError,
     clearChat
   };

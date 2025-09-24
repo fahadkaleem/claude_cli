@@ -1,9 +1,10 @@
-import type { ToolSchema, ToolResult, ToolContext } from './types.js';
+import { ToolErrorType, ToolKind, type ToolSchema, type ToolResult, type ToolContext } from './types.js';
 
-export abstract class Tool<TParams = any> {
+export abstract class Tool<TParams extends Record<string, unknown> = Record<string, unknown>> {
   abstract readonly name: string;
   abstract readonly displayName: string;
   abstract readonly description: string;
+  abstract readonly kind: ToolKind;
   abstract readonly inputSchema: ToolSchema['input_schema'];
 
   get schema(): ToolSchema {
@@ -17,7 +18,7 @@ export abstract class Tool<TParams = any> {
   // Format parameters for display (e.g., "Dubai" instead of {city: "Dubai"})
   formatParams(params: TParams): string {
     // Default implementation - subclasses can override
-    const values = Object.values(params as any);
+    const values = Object.values(params);
     return values.length === 1 ? String(values[0]) : JSON.stringify(params);
   }
 
@@ -59,7 +60,10 @@ export abstract class Tool<TParams = any> {
       return {
         success: false,
         output: null,
-        error: validationError,
+        error: {
+          message: validationError,
+          type: ToolErrorType.INVALID_PARAMS
+        },
         display: {
           type: 'error',
           content: validationError,
@@ -75,7 +79,10 @@ export abstract class Tool<TParams = any> {
       return {
         success: false,
         output: null,
-        error: error instanceof Error ? error.message : String(error),
+        error: {
+          message: error instanceof Error ? error.message : String(error),
+          type: ToolErrorType.EXECUTION_FAILED
+        },
         display: {
           type: 'error',
           content: `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`,

@@ -94,6 +94,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, isDisabled, onCl
     // Don't submit empty messages
     if (!value.trim()) return;
 
+    // Special case: Handle "exit" and "quit" as /exit command
+    const trimmedValue = value.trim().toLowerCase();
+    if (trimmedValue === 'exit' || trimmedValue === 'quit') {
+      process.exit(0);
+      return;
+    }
+
     // Case 1: If it's a perfect match command, execute it immediately (like Gemini)
     if (commandService.isPerfectMatch(value)) {
       const { command, args } = commandService.parseCommand(value);

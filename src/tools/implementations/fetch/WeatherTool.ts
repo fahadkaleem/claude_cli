@@ -1,7 +1,8 @@
-import { Tool } from '../core/Tool.js';
-import type { ToolResult, ToolContext } from '../core/types.js';
+import { Tool } from '../../core/Tool.js';
+import { ToolErrorType, ToolKind, type ToolResult, type ToolContext } from '../../core/types.js';
+import { DisplayType } from '../../../constants/ui.js';
 
-interface WeatherParams {
+interface WeatherParams extends Record<string, unknown> {
   city: string;
   units?: 'celsius' | 'fahrenheit';
 }
@@ -19,6 +20,7 @@ export class WeatherTool extends Tool<WeatherParams> {
   readonly name = 'get_weather';
   readonly displayName = 'Weather';
   readonly description = 'Get current weather information for a specific city';
+  readonly kind = ToolKind.Fetch;
   readonly inputSchema = {
     type: 'object' as const,
     properties: {
@@ -71,7 +73,7 @@ export class WeatherTool extends Tool<WeatherParams> {
         success: true,
         output: weatherData,
         display: {
-          type: 'markdown',
+          type: DisplayType.Markdown,
           content: displayContent,
         },
       };
@@ -79,9 +81,13 @@ export class WeatherTool extends Tool<WeatherParams> {
       return {
         success: false,
         output: null,
-        error: `Failed to fetch weather for ${city}`,
+        error: {
+          message: `Failed to fetch weather for ${city}`,
+          type: ToolErrorType.NETWORK_ERROR,
+          details: error instanceof Error ? error.message : 'Unknown error'
+        },
         display: {
-          type: 'error',
+          type: DisplayType.Error,
           content: `Could not get weather for ${city}: ${error instanceof Error ? error.message : 'Unknown error'}`,
         },
       };
@@ -102,7 +108,17 @@ export class WeatherTool extends Tool<WeatherParams> {
         return this.getMockWeather(city, units);
       }
 
-      const data = await response.json() as any;
+      const data = await response.json() as {
+        current_condition?: Array<{
+          temp_C?: string;
+          weatherDesc?: Array<{ value?: string }>;
+          humidity?: string;
+          windspeedKmph?: string;
+        }>;
+        nearest_area?: Array<{
+          areaName?: Array<{ value?: string }>;
+        }>;
+      };
 
       // Parse wttr.in response
       const current = data.current_condition?.[0];
