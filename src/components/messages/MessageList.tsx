@@ -21,7 +21,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   messages.forEach((message, index) => {
     // Add the message itself
     if (message.role === 'user') {
-      // User messages - keep as plain text with cyan color
+      // User messages - keep as plain text with orange color
       messageElements.push(
         <Box key={`msg-${index}`} marginBottom={1}>
           <Text color={Colors.User}>
@@ -30,15 +30,17 @@ export const MessageList: React.FC<MessageListProps> = ({
         </Box>
       );
     } else {
-      // Assistant messages - render as markdown
-      messageElements.push(
-        <Box key={`msg-${index}`} marginBottom={1}>
-          <Text color={Colors.Assistant}>{MessageIndicators.Assistant} </Text>
-          <Box flexGrow={1}>
-            <Markdown>{message.content}</Markdown>
+      // Assistant messages - render as markdown only if there's content
+      if (message.content && message.content.trim()) {
+        messageElements.push(
+          <Box key={`msg-${index}`} marginBottom={1}>
+            <Text color={Colors.Assistant}>{MessageIndicators.Assistant} </Text>
+            <Box flexGrow={1}>
+              <Markdown>{message.content}</Markdown>
+            </Box>
           </Box>
-        </Box>
-      );
+        );
+      }
     }
 
     // Add tool calls as separate items after the message

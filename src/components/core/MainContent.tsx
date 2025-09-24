@@ -1,16 +1,19 @@
 import React from 'react';
-import { Box } from 'ink';
+import { Box, Text } from 'ink';
 import { MessageList } from '../messages/MessageList.js';
 import { Message } from '../../types';
+import { Colors, MessageIndicators } from '../../constants/ui.js';
 
 interface MainContentProps {
   messages: Message[];
   isLoading: boolean;
+  localMessage?: string | null;
 }
 
 export const MainContent: React.FC<MainContentProps> = ({
   messages,
-  isLoading
+  isLoading,
+  localMessage
 }) => {
   return (
     <Box flexDirection="column" flexGrow={1}>
@@ -18,6 +21,14 @@ export const MainContent: React.FC<MainContentProps> = ({
         messages={messages}
         isLoading={isLoading}
       />
+
+      {/* Display local message if present */}
+      {localMessage && (
+        <Box marginBottom={1}>
+          <Text color={Colors.Tool.Completed}>{MessageIndicators.Tool} </Text>
+          <Text>{localMessage}</Text>
+        </Box>
+      )}
     </Box>
   );
 };

@@ -14,7 +14,7 @@ export interface ContextInfo {
 }
 
 export class PromptService {
-  private systemPromptPath: string;
+  private systemPromptPaths: string[];
   private defaultSystemPrompt = `You are Alfred, a helpful CLI assistant with access to tools. Be concise, direct, and focused on helping with command-line tasks.
 
 Key guidelines:
@@ -24,15 +24,22 @@ Key guidelines:
 - Focus on the specific task at hand`;
 
   constructor() {
-    // Default path: ~/.alfred/system.md
-    const configDir = path.join(os.homedir(), '.alfred');
-    this.systemPromptPath = path.join(configDir, 'system.md');
+    // Priority order for loading system prompts:
+    this.systemPromptPaths = [];
 
-    // Allow override via environment variable
+    // 1. Environment variable override (highest priority)
     const customPath = process.env.ALFRED_SYSTEM_MD;
     if (customPath) {
-      this.systemPromptPath = this.expandPath(customPath);
+      this.systemPromptPaths.push(this.expandPath(customPath));
     }
+
+    // 2. Codebase prompt (for development)
+    const codebasePath = path.join(process.cwd(), 'src', 'prompts', 'system.md');
+    this.systemPromptPaths.push(codebasePath);
+
+    // 3. User config directory (for user customization)
+    const userConfigPath = path.join(os.homedir(), '.alfred', 'system.md');
+    this.systemPromptPaths.push(userConfigPath);
   }
 
   private expandPath(filepath: string): string {
@@ -44,15 +51,23 @@ Key guidelines:
 
   /**
    * Load the base system prompt from file or use default
+   * Tries paths in priority order
    */
   private loadSystemPrompt(): string {
-    try {
-      if (fs.existsSync(this.systemPromptPath)) {
-        return fs.readFileSync(this.systemPromptPath, 'utf-8');
+    // Try each path in priority order
+    for (const promptPath of this.systemPromptPaths) {
+      try {
+        if (fs.existsSync(promptPath)) {
+          console.log(`Loading system prompt from: ${promptPath}`);
+          return fs.readFileSync(promptPath, 'utf-8');
+        }
+      } catch (error) {
+        console.warn(`Failed to load system prompt from ${promptPath}:`, error);
       }
-    } catch (error) {
-      console.warn(`Failed to load system prompt from ${this.systemPromptPath}:`, error);
     }
+
+    // Fall back to default if no files found
+    console.log('Using default system prompt (no custom prompt files found)');
     return this.defaultSystemPrompt;
   }
 
@@ -158,18 +173,30 @@ Key guidelines:
    * Write the default system prompt to file (for user customization)
    */
   async initializeSystemPromptFile(): Promise<void> {
-    const dir = path.dirname(this.systemPromptPath);
+    // Use the user config path for initialization (last in the paths array)
+    const userConfigPath = path.join(os.homedir(), '.alfred', 'system.md');
+    const dir = path.dirname(userConfigPath);
 
     // Create directory if it doesn't exist
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
 
+    // Copy from codebase prompt if it exists, otherwise use default
+    const codebasePromptPath = path.join(process.cwd(), 'src', 'prompts', 'system.md');
+    let promptContent = this.defaultSystemPrompt;
+
+    if (fs.existsSync(codebasePromptPath)) {
+      promptContent = fs.readFileSync(codebasePromptPath, 'utf-8');
+    }
+
     // Only write if file doesn't exist
-    if (!fs.existsSync(this.systemPromptPath)) {
-      fs.writeFileSync(this.systemPromptPath, this.defaultSystemPrompt, 'utf-8');
-      console.log(`Created system prompt file at: ${this.systemPromptPath}`);
+    if (!fs.existsSync(userConfigPath)) {
+      fs.writeFileSync(userConfigPath, promptContent, 'utf-8');
+      console.log(`Created system prompt file at: ${userConfigPath}`);
       console.log('You can customize this file to change the assistant\'s behavior.');
+    } else {
+      console.log(`System prompt already exists at: ${userConfigPath}`);
     }
   }
 }

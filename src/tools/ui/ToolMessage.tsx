@@ -3,6 +3,7 @@ import { Box, Text } from 'ink';
 import type { ToolCall } from '../core/types.js';
 import { toolRegistry } from '../core/ToolRegistry.js';
 import { MessageIndicators, Colors } from '../../constants/ui.js';
+import { TaskDisplay } from './TaskDisplay.js';
 
 interface ToolMessageProps {
   toolCall: ToolCall;
@@ -32,6 +33,11 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({ toolCall }) => {
     }
   };
 
+  // Check if we should show full display content for this tool
+  const shouldShowFullDisplay = () => {
+    return toolCall.name === 'write_tasks' && toolCall.result?.display?.content;
+  };
+
   // Get one-line summary of result
   const getResultSummary = () => {
     if (!toolCall.result) return null;
@@ -49,6 +55,17 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({ toolCall }) => {
 
   const resultSummary = getResultSummary();
 
+  // For TodoWrite tool, only show the full display content
+  if (shouldShowFullDisplay() && toolCall.result?.display?.content) {
+    return (
+      <Box>
+        <Text color={getStatusColor()}>{getStatusIndicator()} </Text>
+        <TaskDisplay content={toolCall.result.display.content} />
+      </Box>
+    );
+  }
+
+  // For other tools, show the standard format
   return (
     <Box flexDirection="column">
       {/* Main tool call line */}

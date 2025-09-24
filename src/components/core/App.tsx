@@ -5,7 +5,7 @@ import { Composer } from './Composer.js';
 import { Footer } from './Footer.js';
 import { AppHeader } from './AppHeader.js';
 import { useChat } from '../../hooks/useChat.js';
-import { toolRegistry, fetch as fetchTools } from '../../tools/index.js';
+import { toolRegistry, fetch as fetchTools, workflow as workflowTools } from '../../tools/index.js';
 
 interface AppProps {
   model?: string;
@@ -13,6 +13,7 @@ interface AppProps {
 
 export const App: React.FC<AppProps> = ({ model }) => {
   const [isConnected, setIsConnected] = useState(false);
+  const [localMessage, setLocalMessage] = useState<string | null>(null);
   const {
     messages,
     isLoading,
@@ -28,6 +29,7 @@ export const App: React.FC<AppProps> = ({ model }) => {
       try {
         // Auto-register all tools from categories
         await toolRegistry.autoRegister(fetchTools);
+        await toolRegistry.autoRegister(workflowTools);
 
         setIsConnected(true);
       } catch (err) {
@@ -55,15 +57,23 @@ export const App: React.FC<AppProps> = ({ model }) => {
       <MainContent
         messages={messages}
         isLoading={isLoading}
+        localMessage={localMessage}
       />
 
       <Composer
-        onSubmit={sendMessage}
+        onSubmit={(message) => {
+          setLocalMessage(null); // Clear local message when sending new message
+          sendMessage(message);
+        }}
         isLoading={isLoading}
         error={error}
         isConnected={isConnected}
         queuedMessages={queuedMessages}
-        onClearChat={clearChat}
+        onClearChat={() => {
+          setLocalMessage(null);
+          clearChat();
+        }}
+        onDisplayLocalMessage={setLocalMessage}
       />
 
       <Footer

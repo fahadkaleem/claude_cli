@@ -9,12 +9,13 @@ import type { SlashCommand } from '../../commands/types.js';
 interface ChatInputProps {
   onSubmit: (value: string) => void;
   onClearChat?: () => void;
+  onDisplayLocalMessage?: (message: string) => void;
 }
 
 // Initialize commands once
 registerBuiltInCommands();
 
-export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, onClearChat }) => {
+export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, onClearChat, onDisplayLocalMessage }) => {
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState<SlashCommand[]>([]);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
@@ -73,14 +74,34 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, onClearChat }) =
   });
 
   // Execute a command with given context and arguments
-  const executeCommand = (command: SlashCommand, args: string = '') => {
+  const executeCommand = async (command: SlashCommand, args: string = '') => {
     if (command.action) {
-      const context = createCommandContext();
-      const result = command.action(context, args);
+      try {
+        const context = createCommandContext();
+        const result = await command.action(context, args);
 
-      // Handle command result
-      if (result && 'type' in result && (result as any).type === 'prompt') {
-        onSubmit((result as any).content);
+        // Handle command result
+        if (result) {
+          if (result.type === 'message') {
+            // For local commands like /tasks, we don't send to AI
+            // We'll handle display differently
+            if (onDisplayLocalMessage) {
+              onDisplayLocalMessage(result.content);
+            }
+          } else if (result.type === 'prompt') {
+            onSubmit(result.content);
+          }
+        }
+      } catch (error) {
+        // Display error message to user
+        const errorMessage = error instanceof Error
+          ? `Command error: ${error.message}`
+          : 'An unexpected error occurred while executing the command';
+
+        if (onDisplayLocalMessage) {
+          onDisplayLocalMessage(errorMessage);
+        }
+        console.error('Command execution error:', error);
       }
     }
   };

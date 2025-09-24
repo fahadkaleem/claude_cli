@@ -63,19 +63,6 @@ export class ChatService {
     }
   }
 
-  /**
-   * Validates that messages alternate correctly between user and assistant
-   */
-  private validateMessages(messages: Message[]): void {
-    for (let i = 1; i < messages.length; i++) {
-      const prevRole = messages[i - 1].role;
-      const currRole = messages[i].role;
-
-      if (prevRole === currRole && prevRole !== 'system') {
-        throw new Error(`Invalid message sequence: consecutive ${prevRole} messages`);
-      }
-    }
-  }
 
   /**
    * Formats messages for the Anthropic API
@@ -118,19 +105,6 @@ export class ChatService {
     }
   }
 
-  /**
-   * Builds tool result messages for the API
-   */
-  private buildToolResultMessages(toolCalls: ToolCall[]): MessageParam[] {
-    return toolCalls.map(tc => ({
-      role: 'user' as const,
-      content: [{
-        type: 'tool_result' as const,
-        tool_use_id: tc.id,
-        content: JSON.stringify(tc.result?.output || { error: tc.result?.error || 'No result' })
-      }]
-    }));
-  }
 
   /**
    * Add a user message immediately to the conversation
@@ -200,9 +174,6 @@ export class ChatService {
     }
 
     try {
-      // Validate message history
-      this.validateMessages(this.messages);
-
       // Get tool schemas
       const tools = toolRegistry.getSchemas();
 
@@ -257,18 +228,37 @@ export class ChatService {
       };
       this.messages.push(assistantMessage);
 
-      // If there are tools to execute
-      if (toolUseBlocks.length > 0) {
+      // Continue processing tool calls until done
+      let currentResponse = response;
+      let continueLoop = toolUseBlocks.length > 0;
+
+      while (continueLoop) {
+        // Get current tool use blocks
+        const currentToolBlocks = currentResponse.content.filter(
+          block => block.type === 'tool_use'
+        ) as ToolUseBlock[];
+
+        if (currentToolBlocks.length === 0) {
+          break;
+        }
+
         const executedToolCalls: ToolCall[] = [];
 
         // Process each tool
-        for await (const step of this.processToolCalls(toolUseBlocks)) {
+        for await (const step of this.processToolCalls(currentToolBlocks)) {
           yield step;
 
           if (step.type === 'tool-complete') {
             executedToolCalls.push(step.toolCall);
           }
         }
+
+        // Build tool results as user message content
+        const toolResultContent = executedToolCalls.map(call => ({
+          type: 'tool_result' as const,
+          tool_use_id: call.id,
+          content: call.result?.output ? JSON.stringify(call.result.output) : 'No output'
+        }));
 
         // Send tool results back to the model
         yield { type: 'thinking' };
@@ -281,30 +271,60 @@ export class ChatService {
             ...this.formatMessagesForAPI(this.messages),
             {
               role: 'assistant' as const,
-              content: response.content
+              content: currentResponse.content
             },
-            ...this.buildToolResultMessages(executedToolCalls)
+            {
+              role: 'user' as const,
+              content: toolResultContent
+            }
           ],
           tools: tools.length > 0 ? tools : undefined,
         });
 
+        // Check stop reason
+        const stopReason = (followUpResponse as any).stop_reason;
+
         // Process follow-up response
         const followUpTextBlocks = followUpResponse.content
           .filter(block => block.type === 'text') as TextBlock[];
+        const followUpToolBlocks = followUpResponse.content
+          .filter(block => block.type === 'tool_use') as ToolUseBlock[];
+
         const followUpText = followUpTextBlocks
           .map(block => block.text)
           .join('');
 
-        if (followUpText) {
-          yield { type: 'assistant', content: followUpText };
+        // Prepare tool calls for display
+        let newToolCalls: ToolCall[] | undefined;
+        if (followUpToolBlocks.length > 0) {
+          newToolCalls = followUpToolBlocks.map(block => ({
+            id: block.id,
+            name: block.name,
+            input: block.input,
+            status: ToolStatus.Pending,
+            result: undefined
+          }));
+        }
+
+        if (followUpText || newToolCalls) {
+          yield {
+            type: 'assistant',
+            content: followUpText,
+            toolCalls: newToolCalls
+          };
 
           // Add follow-up to history
           this.messages.push({
             role: 'assistant',
             content: followUpText,
-            timestamp: new Date()
+            timestamp: new Date(),
+            toolCalls: newToolCalls
           });
         }
+
+        // Continue if there are more tools to execute
+        currentResponse = followUpResponse;
+        continueLoop = followUpToolBlocks.length > 0 || stopReason === 'tool_use';
       }
 
       yield { type: 'complete' };
