@@ -3,23 +3,30 @@ import React from 'react';
 import { render } from 'ink';
 import meow from 'meow';
 import { App } from './components/core/App.js';
+import { promptService } from './services/PromptService.js';
 
 const cli = meow(`
   Usage
-    $ claude-chat [options]
+    $ alfred [options]
 
   Options
-    --model, -m     Model to use (default: claude-sonnet-4-20250514)
-    --help, -h      Show help
-    --version, -v   Show version
+    --model, -m        Model to use (default: claude-sonnet-4-20250514)
+    --init-prompt      Initialize system prompt file for customization
+    --help, -h         Show help
+    --version, -v      Show version
 
   Examples
-    $ claude-chat
-    $ claude-chat --model claude-sonnet-4-20250514
+    $ alfred
+    $ alfred --model claude-sonnet-4-20250514
+    $ alfred --init-prompt
 
   Controls
     Enter           Send message
     Ctrl+C          Exit
+
+  Customization
+    System prompt can be customized at ~/.alfred/system.md
+    Or set ALFRED_SYSTEM_MD env var to use a different path
 `, {
   importMeta: import.meta,
   flags: {
@@ -27,6 +34,10 @@ const cli = meow(`
       type: 'string',
       shortFlag: 'm',
       default: 'claude-sonnet-4-20250514'
+    },
+    initPrompt: {
+      type: 'boolean',
+      default: false
     },
     help: {
       type: 'boolean',
@@ -49,6 +60,15 @@ if (cli.flags.version) {
   process.exit(0);
 }
 
-const { waitUntilExit } = render(<App model={cli.flags.model} />);
-
-waitUntilExit().catch(console.error);
+// Handle --init-prompt flag
+if (cli.flags.initPrompt) {
+  promptService.initializeSystemPromptFile()
+    .then(() => process.exit(0))
+    .catch(error => {
+      console.error('Failed to initialize system prompt:', error);
+      process.exit(1);
+    });
+} else {
+  const { waitUntilExit } = render(<App model={cli.flags.model} />);
+  waitUntilExit().catch(console.error);
+}

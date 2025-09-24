@@ -5,6 +5,7 @@ export interface Message {
   content: string;
   timestamp?: Date;
   toolCalls?: ToolCall[];
+  queued?: boolean; // Indicates message is queued while AI is processing
 }
 
 export interface ChatState {

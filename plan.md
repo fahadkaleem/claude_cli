@@ -1,7 +1,7 @@
-# Claude CLI Architecture Plan
+# Alfred CLI Architecture Plan
 
 ## Overview
-Restructuring the Claude CLI to follow a modular, scalable architecture inspired by (but not copying) Gemini's well-organized structure. This will enable easy addition of features and better maintainability.
+Restructuring the Alfred CLI to follow a modular, scalable architecture inspired by (but not copying) Gemini's well-organized structure. This will enable easy addition of features and better maintainability.
 
 ## Component Structure
 
@@ -162,7 +162,7 @@ Ready to support:
 ## Tool System Architecture
 
 ### Overview
-Implementing a modular tool system that integrates with Anthropic's function calling capabilities, allowing Claude to execute actions like fetching weather, running calculations, or interacting with external services.
+Implementing a modular tool system that integrates with Anthropic's function calling capabilities, allowing the assistant to execute actions like fetching weather, running calculations, or interacting with external services.
 
 ### Tool Components
 

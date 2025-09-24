@@ -1,4 +1,4 @@
-# How to Run Claude CLI Chat
+# How to Run Alfred CLI
 
 ## Setup
 
@@ -27,12 +27,12 @@ node demo.js
 ### Option 3: Install Globally and Run
 ```bash
 npm install -g .
-claude-chat
+alfred
 ```
 
 ## Important Notes
 
-- The full Ink-based CLI app (`npm run dev` or `claude-chat`) requires an interactive terminal with TTY support
+- The full Ink-based CLI app (`npm run dev` or `alfred`) requires an interactive terminal with TTY support
 - It will NOT work when:
   - Output is piped or redirected
   - Running in CI/CD environments

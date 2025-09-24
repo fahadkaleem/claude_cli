@@ -5,6 +5,7 @@ import { getConfig } from './config.js';
 import { toolRegistry } from '../tools/core/ToolRegistry.js';
 import { toolExecutor } from '../tools/core/ToolExecutor.js';
 import { ToolCall, ToolStatus } from '../tools/core/types.js';
+import { promptService } from './PromptService.js';
 
 // Clean type definitions with proper discriminated unions
 export interface AssistantStep {
@@ -132,6 +133,18 @@ export class ChatService {
   }
 
   /**
+   * Add a user message immediately to the conversation
+   */
+  addUserMessage(content: string): void {
+    const userMessage: Message = {
+      role: 'user',
+      content,
+      timestamp: new Date()
+    };
+    this.messages.push(userMessage);
+  }
+
+  /**
    * Main method to send a message and handle the response.
    * Uses promise chaining to ensure messages are processed in order.
    */
@@ -174,14 +187,17 @@ export class ChatService {
 
     const config = getConfig();
 
-    // Add user message to conversation
-    const userMessage: Message = {
-      role: 'user',
-      content,
-      timestamp: new Date()
-    };
-
-    this.messages.push(userMessage);
+    // Check if user message was already added
+    const lastMessage = this.messages[this.messages.length - 1];
+    if (!lastMessage || lastMessage.role !== 'user' || lastMessage.content !== content) {
+      // Add user message to conversation if not already added
+      const userMessage: Message = {
+        role: 'user',
+        content,
+        timestamp: new Date()
+      };
+      this.messages.push(userMessage);
+    }
 
     try {
       // Validate message history
@@ -190,10 +206,14 @@ export class ChatService {
       // Get tool schemas
       const tools = toolRegistry.getSchemas();
 
+      // Get system prompt with context
+      const systemPrompt = promptService.getSystemPrompt(tools.length);
+
       // Make initial API call
       const response = await this.client.messages.create({
         model: config.model,
         max_tokens: config.maxTokens || 4096,
+        system: systemPrompt,
         messages: this.formatMessagesForAPI(this.messages),
         tools: tools.length > 0 ? tools : undefined,
       });
@@ -256,6 +276,7 @@ export class ChatService {
         const followUpResponse = await this.client.messages.create({
           model: config.model,
           max_tokens: config.maxTokens || 4096,
+          system: systemPrompt,
           messages: [
             ...this.formatMessagesForAPI(this.messages),
             {

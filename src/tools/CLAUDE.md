@@ -19,7 +19,7 @@ interface MyToolParams extends Record<string, unknown> {
 }
 
 export class MyTool extends Tool<MyToolParams> {
-  // Required: API name Claude will use
+  // Required: API name the assistant will use
   readonly name = 'my_tool_name';
 
   // Required: User-friendly display name
@@ -183,14 +183,14 @@ src/tools/
 │       ├── TimezoneTool.ts
 │       └── index.ts      # Export all fetch tools
 ├── index.ts              # Main export
-└── CLAUDE.md            # This file
+└── ALFRED.md            # This file
 ```
 
 ## Best Practices
 
 1. **Keep tools focused** - One tool, one job
 2. **Use clear names** - Tool name should describe what it does
-3. **Provide good descriptions** - Help Claude understand when to use the tool
+3. **Provide good descriptions** - Help the assistant understand when to use the tool
 4. **Handle errors gracefully** - Always return proper error messages
 5. **Use appropriate display types** - markdown for rich content, text for simple, error for failures
 6. **Implement formatParams** - Makes tool calls more readable in the UI
@@ -200,7 +200,7 @@ src/tools/
 
 1. Build: `npm run build`
 2. Run: `npm start`
-3. Ask Claude to use your tool: "Can you [use your tool] for [params]?"
+3. Ask Alfred to use your tool: "Can you [use your tool] for [params]?"
 
 ## Need Help?
 

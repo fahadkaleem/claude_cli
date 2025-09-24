@@ -1,10 +1,10 @@
 {
-  "name": "claude-cli-chat",
+  "name": "alfred-cli",
   "version": "1.0.0",
-  "description": "Interactive CLI chat application for Anthropic Claude",
+  "description": "Alfred - Your personal CLI assistant powered by Claude AI",
   "main": "dist/cli.js",
   "bin": {
-    "claude-chat": "./bin/cli.js"
+    "alfred": "./bin/cli.js"
   },
   "scripts": {
     "build": "tsc",
@@ -17,7 +17,7 @@
     "cli",
     "chat",
     "anthropic",
-    "claude",
+    "alfred",
     "terminal",
     "ink"
   ],

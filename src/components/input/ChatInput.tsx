@@ -8,14 +8,13 @@ import type { SlashCommand } from '../../commands/types.js';
 
 interface ChatInputProps {
   onSubmit: (value: string) => void;
-  isDisabled: boolean;
   onClearChat?: () => void;
 }
 
 // Initialize commands once
 registerBuiltInCommands();
 
-export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, isDisabled, onClearChat }) => {
+export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, onClearChat }) => {
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState<SlashCommand[]>([]);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
@@ -33,7 +32,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, isDisabled, onCl
 
   // Handle keyboard navigation for suggestions
   useInput((input, key) => {
-    if (isDisabled) return;
 
     // Handle suggestions navigation
     if (suggestions.length > 0) {
@@ -89,7 +87,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, isDisabled, onCl
 
   // Handle submit on Enter key
   const handleSubmit = (value: string) => {
-    if (isDisabled) return;
 
     // Don't submit empty messages
     if (!value.trim()) return;
@@ -142,7 +139,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, isDisabled, onCl
   };
 
   const handleInputChange = (value: string) => {
-    if (isDisabled) return;
     setInputValue(value);
   };
 
@@ -151,16 +147,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, isDisabled, onCl
       {/* Input box with rounded corners */}
       <Box borderStyle="round" borderColor="gray" paddingX={1}>
         <Text color="gray" bold>{'> '}</Text>
-        {!isDisabled ? (
-          <TextInput
-            value={inputValue}
-            onChange={handleInputChange}
-            onSubmit={handleSubmit}
-            focus={!isDisabled}
-          />
-        ) : (
-          <Text color="gray">Waiting for response...</Text>
-        )}
+        <TextInput
+          value={inputValue}
+          onChange={handleInputChange}
+          onSubmit={handleSubmit}
+          focus={true}
+        />
       </Box>
 
       {/* Show suggestions below the input */}

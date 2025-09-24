@@ -8,7 +8,7 @@ export interface CommandContext {
   addMessage: (role: 'user' | 'assistant' | 'system', content: string) => void;
   // Clear the chat history
   clearChat: () => void;
-  // Send a message to Claude
+  // Send a message to the AI assistant
   sendToAI: (message: string) => void;
   // Current settings
   settings?: {
