@@ -1,13 +1,8 @@
 import { Tool } from '../../core/Tool.js';
 import { ToolKind, ToolErrorType, type ToolResult, type ToolContext } from '../../core/types.js';
+import { TASK_STATUS_INDICATORS, type TaskStatus } from '../../ui/constants/taskIndicators.js';
 
 // Constants
-const TASK_STATUS_INDICATORS = {
-  pending: '☐',
-  in_progress: '▶',
-  completed: '☑',
-  cancelled: '☑'
-} as const;
 
 const ANSI_CODES = {
   STRIKETHROUGH: '\x1b[9m',
@@ -15,8 +10,6 @@ const ANSI_CODES = {
 } as const;
 
 const TASK_TITLE = 'Tasks';
-
-export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 
 export interface Task {
   content: string;        // Imperative form: "Run tests"

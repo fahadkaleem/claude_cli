@@ -63,6 +63,7 @@ export enum ToolErrorType {
   NETWORK_ERROR = 'network_error',
   TIMEOUT = 'timeout',
   PERMISSION_DENIED = 'permission_denied',
+  FILE_NOT_FOUND = 'file_not_found',
   UNKNOWN = 'unknown',
 }
 

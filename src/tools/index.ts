@@ -1,6 +1,7 @@
 // Export all tools from category directories
 export * as fetch from './implementations/fetch/index.js';
 export * as workflow from './implementations/workflow/index.js';
+export * as filesystem from './implementations/filesystem/index.js';
 
 // Export core functionality
 export { toolRegistry } from './core/ToolRegistry.js';

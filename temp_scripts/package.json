@@ -1,0 +1,20 @@
+{
+  "name": "temp_scripts",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "ink": "^6.3.1",
+    "ink-big-text": "^2.0.0",
+    "ink-gradient": "^3.0.0",
+    "react": "^19.1.1",
+    "tsx": "^4.20.5"
+  }
+}

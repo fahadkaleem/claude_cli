@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Text } from 'ink';
+import { getStatusFromIndicator, TASK_STATUS_COLORS } from './constants/taskIndicators.js';
 
 interface TaskDisplayProps {
   content: string;
@@ -15,15 +16,22 @@ export const TaskDisplay: React.FC<TaskDisplayProps> = ({ content }) => {
   return (
     <Box flexDirection="column">
       {lines.map((line, index) => {
-        // Check if this is an in-progress task (has ▶ indicator)
-        const isInProgress = line.includes('▶');
+        // Get the task status from the line content
+        const status = getStatusFromIndicator(line);
 
-        if (isInProgress) {
-          // Render in-progress tasks in green
-          return <Text key={index} color="green">{line}</Text>;
+        if (status) {
+          // Get the color for this status
+          const color = TASK_STATUS_COLORS[status];
+
+          // Special handling for different statuses
+          if (status === 'pending') {
+            return <Text key={index} dimColor>{line}</Text>;
+          }
+
+          return <Text key={index} color={color}>{line}</Text>;
         }
 
-        // Regular lines (title, pending, completed)
+        // Regular lines (title, etc)
         return <Text key={index}>{line}</Text>;
       })}
     </Box>

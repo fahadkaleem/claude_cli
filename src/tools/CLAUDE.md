@@ -45,6 +45,8 @@ export class MyTool extends Tool<MyToolParams> {
       },
     },
     required: ['param1'],
+    additionalProperties: false,  // Add this for strict validation
+    $schema: 'http://json-schema.org/draft-07/schema#',  // Add schema version
   };
 
   // Optional: Override for cleaner parameter display
@@ -106,8 +108,24 @@ Add to `src/tools/implementations/[category]/index.ts`:
 export { MyTool } from './MyTool.js';
 ```
 
-### Step 4: Done!
-The tool is automatically registered when the app starts. No manual registration needed.
+### Step 4: Register in App.tsx
+
+**IMPORTANT**: New tool categories must be registered in `src/components/core/App.tsx`:
+
+1. Import your category from tools index:
+```typescript
+import { toolRegistry, fetch as fetchTools, workflow as workflowTools, filesystem as filesystemTools } from '../../tools/index.js';
+```
+
+2. Register in the useEffect hook:
+```typescript
+await toolRegistry.autoRegister(filesystemTools);
+```
+
+Without this step, your tools won't be available to the assistant!
+
+### Step 5: Done!
+The tool is now registered and available when the app starts.
 
 ## Tool Categories (ToolKind)
 
@@ -176,14 +194,18 @@ src/tools/
 ├── core/
 │   ├── Tool.ts           # Base class
 │   ├── ToolRegistry.ts   # Auto-registration
-│   └── types.ts          # All types
+│   └── types.ts          # All types, including ToolErrorType enum
 ├── implementations/
-│   └── fetch/
-│       ├── WeatherTool.ts
-│       ├── TimezoneTool.ts
-│       └── index.ts      # Export all fetch tools
-├── index.ts              # Main export
-└── ALFRED.md            # This file
+│   ├── fetch/           # API calls, web requests
+│   │   └── index.ts
+│   ├── workflow/        # Task management, workflow tools
+│   │   ├── TaskWriteTool.ts
+│   │   └── index.ts
+│   └── filesystem/      # File operations
+│       ├── ReadTool.ts
+│       └── index.ts
+├── index.ts              # Main export (exports all categories)
+└── CLAUDE.md            # This file
 ```
 
 ## Best Practices
@@ -196,15 +218,24 @@ src/tools/
 6. **Implement formatParams** - Makes tool calls more readable in the UI
 7. **Add progress updates** - For long-running operations
 
+## Common Pitfalls & Solutions
+
+1. **Tool not found**: Make sure you registered the category in App.tsx
+2. **Missing error types**: Add new error types to `ToolErrorType` enum in types.ts
+3. **Validation issues**: Override `validate()` method for custom validation
+4. **Parameter naming**: Use snake_case for tool parameters (e.g., `file_path` not `filePath`)
+5. **Schema validation**: Always include `additionalProperties: false` and `$schema`
+
 ## Testing Your Tool
 
 1. Build: `npm run build`
 2. Run: `npm start`
 3. Ask Alfred to use your tool: "Can you [use your tool] for [params]?"
+4. Check the tool appears in registry: The app logs registered tools on startup
 
 ## Need Help?
 
 - All tools extend `Tool` base class from `core/Tool.ts`
-- See `WeatherTool.ts` or `TimezoneTool.ts` for complete examples
+- See `ReadTool.ts` or `TaskWriteTool.ts` for complete, working examples
 - Tools are auto-discovered via `toolRegistry.autoRegister()` in App.tsx
 - No manual registration, no defensive code, no backwards compatibility needed
