@@ -1,8 +1,8 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import { ChatInput } from '../input/ChatInput.js';
-import { StatusBar } from '../status/StatusBar.js';
-import { Colors, MessageIndicators } from '../../constants/ui.js';
+import { InputPrompt } from './InputPrompt.js';
+import { StatusBar } from './StatusBar.js';
+import { Colors, MessageIndicators } from '../constants.js';
 
 interface ComposerProps {
   onSubmit: (message: string) => void;
@@ -40,7 +40,7 @@ export const Composer: React.FC<ComposerProps> = ({
         </Box>
       )}
 
-      <ChatInput
+      <InputPrompt
         onSubmit={onSubmit}
         onClearChat={onClearChat}
         onDisplayLocalMessage={onDisplayLocalMessage}

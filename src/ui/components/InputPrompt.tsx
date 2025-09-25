@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
-import { SuggestionList } from './SuggestionList.js';
+import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import { commandService } from '../../services/CommandService.js';
-import { registerBuiltInCommands } from '../../commands/registerCommands.js';
-import type { SlashCommand } from '../../commands/types.js';
+import { registerBuiltInCommands } from '../commands/registerCommands.js';
+import type { SlashCommand } from '../commands/types.js';
 
-interface ChatInputProps {
+interface InputPromptProps {
   onSubmit: (value: string) => void;
   onClearChat?: () => void;
   onDisplayLocalMessage?: (message: string) => void;
@@ -15,7 +15,7 @@ interface ChatInputProps {
 // Initialize commands once
 registerBuiltInCommands();
 
-export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, onClearChat, onDisplayLocalMessage }) => {
+export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat, onDisplayLocalMessage }) => {
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState<SlashCommand[]>([]);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
@@ -119,7 +119,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, onClearChat, onD
       return;
     }
 
-    // Case 1: If it's a perfect match command, execute it immediately (like Gemini)
+    // Case 1: If it's a perfect match command, execute it immediately
     if (commandService.isPerfectMatch(value)) {
       const { command, args } = commandService.parseCommand(value);
       if (command) {
@@ -178,7 +178,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, onClearChat, onD
 
       {/* Show suggestions below the input */}
       {suggestions.length > 0 && (
-        <SuggestionList
+        <SuggestionsDisplay
           suggestions={suggestions}
           selectedIndex={selectedSuggestionIndex}
         />

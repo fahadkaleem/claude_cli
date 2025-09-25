@@ -1,7 +1,7 @@
 # Alfred CLI Architecture Plan
 
 ## Overview
-Restructuring the Alfred CLI to follow a modular, scalable architecture inspired by (but not copying) Gemini's well-organized structure. This will enable easy addition of features and better maintainability.
+Restructuring the Alfred CLI to follow a modular, scalable architecture with clean separation of concerns. This will enable easy addition of features and better maintainability.
 
 ## Component Structure
 
@@ -154,7 +154,7 @@ Ready to support:
 
 ## Notes
 
-- Inspired by Gemini's architecture but not copying
+- Following clean architecture principles
 - Focus on our specific needs
 - Maintain simplicity where possible
 - Progressive enhancement approach

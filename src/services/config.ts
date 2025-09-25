@@ -1,5 +1,5 @@
 import * as dotenv from 'dotenv';
-import { Config } from '../types';
+import { Config } from '../ui/types';
 
 // Load .env file silently (quiet option not in types but works)
 dotenv.config({ silent: true } as dotenv.DotenvConfigOptions);

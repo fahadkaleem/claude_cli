@@ -1,8 +1,8 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import { MessageList } from '../messages/MessageList.js';
-import { Message } from '../../types';
-import { Colors, MessageIndicators } from '../../constants/ui.js';
+import { MessageList } from './MessageList.js';
+import { Message } from '../types';
+import { Colors, MessageIndicators } from '../constants.js';
 
 interface MainContentProps {
   messages: Message[];

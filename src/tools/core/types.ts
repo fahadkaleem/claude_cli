@@ -32,7 +32,7 @@ export interface ToolResult<TOutput = unknown> {
   error?: ToolError;
 }
 
-import type { DisplayTypeValue } from '../../constants/ui.js';
+import type { DisplayTypeValue } from '../../ui/constants.js';
 
 export interface ToolDisplay {
   type: DisplayTypeValue;

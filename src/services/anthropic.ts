@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { MessageParam, ContentBlock, TextBlock, ToolUseBlock } from '@anthropic-ai/sdk/resources/messages';
-import { Message } from '../types';
+import { Message } from '../ui/types';
 import { getConfig } from './config.js';
 import { toolRegistry } from '../tools/core/ToolRegistry.js';
 import { toolExecutor } from '../tools/core/ToolExecutor.js';
@@ -41,12 +41,12 @@ export type AgentStep =
 
 /**
  * Main chat service that handles message ordering and tool execution.
- * Inspired by Gemini's clean architecture.
+ * Follows clean architecture principles.
  */
 export class ChatService {
   private client: Anthropic | null = null;
 
-  // Promise chain to ensure messages are processed in order (like Gemini)
+  // Promise chain to ensure messages are processed in order
   private sendPromise: Promise<void> = Promise.resolve();
 
   // Current conversation messages
@@ -126,7 +126,7 @@ export class ChatService {
     // Chain this send operation to ensure ordering
     const streamGenerator = this.executeMessageFlow(content);
 
-    // Use the promise chain pattern from Gemini
+    // Use the promise chain pattern for message ordering
     const previousPromise = this.sendPromise;
 
     // Create a promise that will resolve when this message is done

@@ -67,7 +67,7 @@
 ## Implementation Example: Refactored Weather Tool
 
 ```typescript
-// New pattern following Gemini
+// New pattern following clean architecture
 export class WeatherTool extends DeclarativeTool<WeatherParams, WeatherResult> {
   constructor() {
     super(

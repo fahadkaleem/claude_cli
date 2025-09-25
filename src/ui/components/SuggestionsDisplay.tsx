@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Text } from 'ink';
-import { SlashCommand } from '../../commands/types.js';
+import { SlashCommand } from '../commands/types.js';
 
-interface SuggestionListProps {
+interface SuggestionsDisplayProps {
   suggestions: SlashCommand[];
   selectedIndex: number;
   maxVisible?: number;
@@ -10,7 +10,7 @@ interface SuggestionListProps {
 
 const MAX_SUGGESTIONS_TO_SHOW = 5;
 
-export const SuggestionList: React.FC<SuggestionListProps> = ({
+export const SuggestionsDisplay: React.FC<SuggestionsDisplayProps> = ({
   suggestions,
   selectedIndex,
   maxVisible = MAX_SUGGESTIONS_TO_SHOW

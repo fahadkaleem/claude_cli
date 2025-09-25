@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import Markdown from '@inkkit/ink-markdown';
-import { DisplayType, type DisplayTypeValue } from '../../constants/ui.js';
+import { DisplayType, type DisplayTypeValue } from '../constants.js';
 
 interface MessageContentProps {
   content: string;
