@@ -22,9 +22,9 @@ export const MainContent: React.FC<MainContentProps> = ({
         isLoading={isLoading}
       />
 
-      {/* Display local message if present */}
-      {localMessage && (
-        <Box marginBottom={1}>
+      {/* Display local message if present (for non-abort messages) */}
+      {localMessage && !localMessage.includes('\x1b[31m') && (
+        <Box>
           <Text color={Colors.Tool.Completed}>{MessageIndicators.Tool} </Text>
           <Text>{localMessage}</Text>
         </Box>

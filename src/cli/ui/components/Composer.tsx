@@ -12,6 +12,7 @@ interface ComposerProps {
   queuedMessages?: string[];
   onClearChat?: () => void;
   onDisplayLocalMessage?: (message: string) => void;
+  onAbortOperation?: () => void;
 }
 
 export const Composer: React.FC<ComposerProps> = ({
@@ -21,7 +22,8 @@ export const Composer: React.FC<ComposerProps> = ({
   isConnected,
   queuedMessages = [],
   onClearChat,
-  onDisplayLocalMessage
+  onDisplayLocalMessage,
+  onAbortOperation
 }) => {
   return (
     <Box flexDirection="column">
@@ -44,6 +46,8 @@ export const Composer: React.FC<ComposerProps> = ({
         onSubmit={onSubmit}
         onClearChat={onClearChat}
         onDisplayLocalMessage={onDisplayLocalMessage}
+        onAbortOperation={onAbortOperation}
+        isLoading={isLoading}
       />
     </Box>
   );

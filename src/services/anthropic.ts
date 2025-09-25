@@ -122,9 +122,9 @@ export class ChatService {
    * Main method to send a message and handle the response.
    * Uses promise chaining to ensure messages are processed in order.
    */
-  async* sendMessage(content: string): AsyncGenerator<AgentStep> {
+  async* sendMessage(content: string, signal?: AbortSignal): AsyncGenerator<AgentStep> {
     // Chain this send operation to ensure ordering
-    const streamGenerator = this.executeMessageFlow(content);
+    const streamGenerator = this.executeMessageFlow(content, signal);
 
     // Use the promise chain pattern for message ordering
     const previousPromise = this.sendPromise;
@@ -143,8 +143,18 @@ export class ChatService {
 
       // Now process this message
       for await (const step of streamGenerator) {
+        // Check if aborted
+        if (signal?.aborted) {
+          throw new Error('AbortError');
+        }
         yield step;
       }
+    } catch (error) {
+      // Re-throw abort errors
+      if (error instanceof Error && error.message === 'AbortError') {
+        throw error;
+      }
+      throw error;
     } finally {
       // Mark this message as complete
       resolveSend!();
@@ -154,7 +164,7 @@ export class ChatService {
   /**
    * The actual message flow execution
    */
-  private async* executeMessageFlow(content: string): AsyncGenerator<AgentStep> {
+  private async* executeMessageFlow(content: string, signal?: AbortSignal): AsyncGenerator<AgentStep> {
     if (!this.client) {
       throw new Error('Client not initialized');
     }
@@ -351,6 +361,18 @@ export class ChatService {
   clearMessages(): void {
     this.messages = [];
   }
+
+  /**
+   * Remove the last assistant message if it exists
+   * Used when aborting a response
+   */
+  removeLastAssistantMessage(): void {
+    const lastMessage = this.messages[this.messages.length - 1];
+    if (lastMessage && lastMessage.role === 'assistant') {
+      this.messages.pop();
+    }
+  }
+
 }
 
 // Singleton instance

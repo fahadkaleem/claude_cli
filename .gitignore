@@ -2,3 +2,4 @@ examplecode/
 .env
 node_modules/
 dist/
+.idea/

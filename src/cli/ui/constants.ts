@@ -5,6 +5,7 @@ export const MessageIndicators = {
   Assistant: '●',
   Tool: '●',
   ToolResult: '⎿',
+  System: '⎿',
 } as const;
 
 export const Colors = {
@@ -39,5 +40,7 @@ export const LoadingMessages = {
 export const SpinnerType = {
   Default: 'dots',
 } as const;
+
+export const InterruptedIndicator = '⎿  Interrupted' as const;
 
 export type DisplayTypeValue = typeof DisplayType[keyof typeof DisplayType];

@@ -21,7 +21,8 @@ export const App: React.FC<AppProps> = ({ model }) => {
     queuedMessages,
     sendMessage,
     clearError,
-    clearChat
+    clearChat,
+    abortOperation
   } = useChat();
 
   useEffect(() => {
@@ -75,6 +76,7 @@ export const App: React.FC<AppProps> = ({ model }) => {
           clearChat();
         }}
         onDisplayLocalMessage={setLocalMessage}
+        onAbortOperation={abortOperation}
       />
 
       <Footer

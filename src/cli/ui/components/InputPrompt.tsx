@@ -4,21 +4,41 @@ import TextInput from 'ink-text-input';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import { commandService } from '../../../services/CommandService.js';
 import { registerBuiltInCommands } from '../commands/registerCommands.js';
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts.js';
 import type { SlashCommand } from '../commands/types.js';
 
 interface InputPromptProps {
   onSubmit: (value: string) => void;
   onClearChat?: () => void;
   onDisplayLocalMessage?: (message: string) => void;
+  onAbortOperation?: () => void;
+  isLoading?: boolean;
 }
 
 // Initialize commands once
 registerBuiltInCommands();
 
-export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat, onDisplayLocalMessage }) => {
+export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat, onDisplayLocalMessage, onAbortOperation, isLoading = false }) => {
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState<SlashCommand[]>([]);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
+
+  // Use keyboard shortcuts hook
+  const { escapeCount, showEscapeHint } = useKeyboardShortcuts({
+    isActive: true,
+    inputValue,
+    setInputValue,
+    onClearInput: () => setInputValue(''),
+    onAbort: () => {
+      if (isLoading) {
+        // Abort the current AI operation
+        if (onAbortOperation) {
+          onAbortOperation();
+        }
+      }
+    },
+    onClearScreen: onClearChat,
+  });
 
   // Update suggestions when input changes
   useEffect(() => {
@@ -165,6 +185,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat,
 
   return (
     <Box flexDirection="column">
+      {/* Show escape hint when first ESC is pressed */}
+      {showEscapeHint && (
+        <Box marginBottom={1}>
+          <Text color="yellow" dimColor>
+            Press ESC again to clear input
+          </Text>
+        </Box>
+      )}
+
       {/* Input box with rounded corners */}
       <Box borderStyle="round" borderColor="gray" paddingX={1}>
         <Text color="gray" bold>{'> '}</Text>
