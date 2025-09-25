@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import type { ToolCall } from '../core/types.js';
 import { toolRegistry } from '../core/ToolRegistry.js';
-import { MessageIndicators, Colors } from '../../ui/constants.js';
+import { MessageIndicators, Colors } from '../../cli/ui/constants.js';
 import { TaskDisplay } from './TaskDisplay.js';
 
 interface ToolMessageProps {

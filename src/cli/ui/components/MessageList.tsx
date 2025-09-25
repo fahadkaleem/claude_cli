@@ -3,7 +3,7 @@ import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
 import Markdown from '@inkkit/ink-markdown';
 import { Message } from '../types';
-import { ToolMessage } from '../../tools/ui/ToolMessage.js';
+import { ToolMessage } from '../../../tools/ui/ToolMessage.js';
 import { MessageIndicators, Colors, DisplayType, LoadingMessages, SpinnerType } from '../constants.js';
 
 interface MessageListProps {

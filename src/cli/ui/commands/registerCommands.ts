@@ -1,4 +1,4 @@
-import { commandService } from '../../services/CommandService.js';
+import { commandService } from '../../../services/CommandService.js';
 import { allCommands } from './index.js';
 
 /**

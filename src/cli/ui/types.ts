@@ -1,4 +1,4 @@
-import type { ToolCall } from '../tools/core/types.js';
+import type { ToolCall } from '../../tools/core/types.js';
 
 export interface Message {
   role: 'user' | 'assistant' | 'system';

@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { Message, ChatState } from '../types';
-import { chatService } from '../../services/anthropic.js';
-import type { ToolCall } from '../../tools/core/types.js';
+import { chatService } from '../../../services/anthropic.js';
+import type { ToolCall } from '../../../tools/core/types.js';
 
 export const useChat = () => {
   const [state, setState] = useState<ChatState>({

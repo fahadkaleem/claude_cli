@@ -5,7 +5,7 @@ import { Composer } from './Composer.js';
 import { Footer } from './Footer.js';
 import { AppHeader } from './AppHeader.js';
 import { useChat } from '../hooks/useChat.js';
-import { toolRegistry, fetch as fetchTools, workflow as workflowTools, filesystem as filesystemTools } from '../../tools/index.js';
+import { toolRegistry, fetch as fetchTools, workflow as workflowTools, filesystem as filesystemTools } from '../../../tools/index.js';
 
 interface AppProps {
   model?: string;

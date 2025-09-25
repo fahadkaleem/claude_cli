@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { MessageParam, ContentBlock, TextBlock, ToolUseBlock } from '@anthropic-ai/sdk/resources/messages';
-import { Message } from '../ui/types';
+import { Message } from '../cli/ui/types';
 import { getConfig } from './config.js';
 import { toolRegistry } from '../tools/core/ToolRegistry.js';
 import { toolExecutor } from '../tools/core/ToolExecutor.js';

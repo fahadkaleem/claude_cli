@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
-import { commandService } from '../../services/CommandService.js';
+import { commandService } from '../../../services/CommandService.js';
 import { registerBuiltInCommands } from '../commands/registerCommands.js';
 import type { SlashCommand } from '../commands/types.js';
 
