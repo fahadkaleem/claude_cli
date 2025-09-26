@@ -40,9 +40,9 @@ const AppContainerContent: React.FC<AppContainerProps> = ({ model }) => {
     [currentTheme, setCurrentTheme]
   );
 
-  const handleSubmit = useCallback((message: string) => {
+  const handleSubmit = useCallback((message: string, displayMessage?: string) => {
     setLocalMessage(null);
-    sendMessage(message);
+    sendMessage(message, displayMessage);
   }, [sendMessage]);
 
   const handleClearChat = useCallback(() => {

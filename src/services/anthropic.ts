@@ -108,11 +108,14 @@ export class ChatService {
 
   /**
    * Add a user message immediately to the conversation
+   * @param content Content for API (with expanded file paths)
+   * @param displayContent Optional display version (with placeholders)
    */
-  addUserMessage(content: string): void {
+  addUserMessage(content: string, displayContent?: string): void {
     const userMessage: Message = {
       role: 'user',
       content,
+      displayContent,
       timestamp: new Date()
     };
     this.messages.push(userMessage);

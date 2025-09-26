@@ -2,7 +2,8 @@ import type { ToolCall } from '../../tools/core/types.js';
 
 export interface Message {
   role: 'user' | 'assistant' | 'system';
-  content: string;
+  content: string; // Content sent to API (with expanded @filepaths)
+  displayContent?: string; // Optional display version (with placeholders like [Image #1])
   timestamp?: Date;
   toolCalls?: ToolCall[];
   queued?: boolean; // Indicates message is queued while AI is processing

@@ -38,7 +38,9 @@ export const MessageList: React.FC<MessageListProps> = ({
   messages.forEach((message, index) => {
     // Add the message itself
     if (message.role === 'user') {
-      const { isInterrupted, mainContent, interruptLine } = parseInterruptedMessage(message.content);
+      // Use displayContent if available (with placeholders), otherwise use content
+      const contentToDisplay = message.displayContent || message.content;
+      const { isInterrupted, mainContent, interruptLine } = parseInterruptedMessage(contentToDisplay);
 
       if (isInterrupted) {
         // Display user message with interrupted indicator
@@ -57,7 +59,7 @@ export const MessageList: React.FC<MessageListProps> = ({
         messageElements.push(
           <Box key={`msg-${index}`} marginBottom={1}>
             <Text color={Colors.User}>
-              {MessageIndicators.User} {message.content}
+              {MessageIndicators.User} {contentToDisplay}
             </Text>
           </Box>
         );

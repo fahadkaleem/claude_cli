@@ -3,7 +3,7 @@ import type { ThemePreset } from '../types.js';
 
 export interface UIActions {
   handleThemeSelect: (theme: ThemePreset) => void;
-  onSubmit: (message: string) => void;
+  onSubmit: (message: string, displayMessage?: string) => void;
   onClearChat: () => void;
   onDisplayLocalMessage: (message: string | null) => void;
   onAbortOperation: () => void;

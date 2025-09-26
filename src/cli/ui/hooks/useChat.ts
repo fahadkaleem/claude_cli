@@ -15,12 +15,16 @@ export const useChat = () => {
   const [queuedMessages, setQueuedMessages] = useState<string[]>([]);
 
   // Message queue for when AI is processing
-  const messageQueue = useRef<string[]>([]);
+  const messageQueue = useRef<Array<{content: string, display?: string}>>([]);
   const isProcessing = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Process a single message
-  const processMessage = useCallback(async (content: string, additionalMessages: string[] = []) => {
+  const processMessage = useCallback(async (
+    content: string,
+    displayContent: string | undefined,
+    additionalMessages: Array<{content: string, display?: string}> = []
+  ) => {
     isProcessing.current = true;
 
     // Create new abort controller for this request
@@ -32,14 +36,18 @@ export const useChat = () => {
 
     // Combine all messages with proper indentation
     let combinedMessage = content.trim();
+    let combinedDisplay = displayContent?.trim() || content.trim();
+
     if (additionalMessages.length > 0) {
       // Add queued messages with 2-space indentation to align with "> "
-      const indentedMessages = additionalMessages.map(m => m.trim()).join('\n  ');
+      const indentedMessages = additionalMessages.map(m => m.content.trim()).join('\n  ');
+      const indentedDisplays = additionalMessages.map(m => (m.display || m.content).trim()).join('\n  ');
       combinedMessage += '\n  ' + indentedMessages;
+      combinedDisplay += '\n  ' + indentedDisplays;
     }
 
-    // Add combined message to the service
-    chatService.addUserMessage(combinedMessage);
+    // Add combined message to the service (content for API, displayContent for UI)
+    chatService.addUserMessage(combinedMessage, combinedDisplay);
 
     // Clear queued messages once they're sent
     setQueuedMessages([]);
@@ -162,14 +170,14 @@ export const useChat = () => {
           messageQueue.current = [];
           setQueuedMessages([]);
           // Process the next message along with all other queued messages
-          setTimeout(() => processMessage(nextMessage, allQueued), 0);
+          setTimeout(() => processMessage(nextMessage.content, nextMessage.display, allQueued), 0);
         }
       }
     }
   }, []);
 
   // Public sendMessage function that queues messages
-  const sendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (content: string, displayContent?: string) => {
     if (!content.trim()) return;
 
     // If not processing, process immediately with any existing queued messages
@@ -177,11 +185,12 @@ export const useChat = () => {
       const queued = [...messageQueue.current];
       messageQueue.current = [];
       setQueuedMessages([]);
-      await processMessage(content, queued);
+      await processMessage(content, displayContent, queued);
     } else {
       // Add to queue if already processing
-      messageQueue.current.push(content);
-      setQueuedMessages(prev => [...prev, content.trim()]);
+      const queueItem = {content, display: displayContent};
+      messageQueue.current.push(queueItem);
+      setQueuedMessages(prev => [...prev, (displayContent || content).trim()]);
     }
   }, [processMessage]);
 

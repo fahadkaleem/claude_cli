@@ -21,7 +21,7 @@ import {
 } from '../utils/clipboardUtils.js';
 
 interface InputPromptProps {
-  onSubmit: (value: string) => void;
+  onSubmit: (value: string, displayValue?: string) => void;
   onClearChat?: () => void;
   onDisplayLocalMessage?: (message: string) => void;
   onAbortOperation?: () => void;
@@ -175,9 +175,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat,
     // Don't submit empty messages
     if (!value.trim()) return;
 
-    // Replace placeholders with actual content
-    let processedValue = expandTextPastes(value, pastedTexts);
-    processedValue = expandImagePastes(processedValue, pastedImages, true);
+    // Keep the original value for display (with placeholders)
+    const displayValue = value;
+
+    // Create API version with expanded paths
+    let apiValue = expandTextPastes(value, pastedTexts);
+    apiValue = expandImagePastes(apiValue, pastedImages, true);
 
     // Special case: Handle "exit" and "quit" as /exit command
     const trimmedValue = value.trim().toLowerCase();
@@ -215,11 +218,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat,
         executeCommand(command, args);
       } else {
         // Unknown command - send as regular message
-        onSubmit(processedValue.trim());
+        onSubmit(apiValue.trim(), displayValue.trim());
       }
     } else {
-      // Regular message - use processed value with expanded pastes
-      onSubmit(processedValue.trim());
+      // Regular message - send API version with expanded paths, display version with placeholders
+      onSubmit(apiValue.trim(), displayValue.trim());
     }
 
     setInputValue('');
