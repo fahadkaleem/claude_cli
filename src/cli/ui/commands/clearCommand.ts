@@ -1,4 +1,5 @@
 import { SlashCommand, CommandCategory } from './types.js';
+import { clearHistory } from '../../../config/alfredConfig.js';
 
 export const clearCommand: SlashCommand = {
   name: 'clear',
@@ -6,8 +7,14 @@ export const clearCommand: SlashCommand = {
   category: CommandCategory.CHAT,
   expectsArgs: false,
 
-  action: (context, args) => {
+  action: async (context, args) => {
     context.clearChat();
+
+    try {
+      await clearHistory();
+    } catch (error) {
+      console.error('Failed to clear history:', error);
+    }
 
     return {
       type: 'clear'

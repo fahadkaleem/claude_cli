@@ -8,6 +8,10 @@ import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts.js';
 import { useDialog } from '../contexts/DialogContext.js';
 import { useTheme } from '../hooks/useTheme.js';
 import { useTerminalWidth } from '../hooks/useTerminalWidth.js';
+import { useArrowKeyHistory } from '../hooks/useArrowKeyHistory.js';
+import { addToHistory } from '../../../config/alfredConfig.js';
+import { readFile } from 'fs/promises';
+import { resolve } from 'path';
 import type { SlashCommand } from '../commands/types.js';
 import {
   saveClipboardImage,
@@ -40,9 +44,22 @@ export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat,
   const [imageCounter, setImageCounter] = useState(1);
   const [pastedImages, setPastedImages] = useState<Map<number, ImageData>>(new Map());
   const [pastedTexts, setPastedTexts] = useState<Map<number, string>>(new Map());
+  const [restoredPastedContents, setRestoredPastedContents] = useState<Record<string, any>>({});
   const { openDialog } = useDialog();
   const { colors } = useTheme();
   const columns = useTerminalWidth();
+
+  // Callback to restore pasted contents from history
+  const handleRestorePastedContents = (pastedContents: Record<string, any>) => {
+    setRestoredPastedContents(pastedContents);
+  };
+
+  // History navigation
+  const { resetHistory, onHistoryUp, onHistoryDown } = useArrowKeyHistory(
+    setInputValue,
+    handleRestorePastedContents,
+    inputValue,
+  );
 
   // Use keyboard shortcuts hook
   const { escapeCount, showEscapeHint } = useKeyboardShortcuts({
@@ -116,6 +133,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat,
         }
         return;
       }
+    } else {
+      // Only use history navigation when there are 0 suggestions (like anonkode does with <= 1)
+      if (key.upArrow) {
+        onHistoryUp();
+        return;
+      } else if (key.downArrow) {
+        onHistoryDown();
+        return;
+      }
     }
   });
 
@@ -169,8 +195,35 @@ export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat,
     }
   };
 
+  // Helper to build pastedContents from current paste state
+  const buildPastedContents = (
+    images: Map<number, ImageData>,
+    texts: Map<number, string>
+  ): Record<string, { id: number; type: 'image' | 'text'; content: string; mediaType?: string }> => {
+    const result: Record<string, { id: number; type: 'image' | 'text'; content: string; mediaType?: string }> = {};
+
+    images.forEach((imageData, id) => {
+      result[id.toString()] = {
+        id,
+        type: 'image',
+        content: imageData.base64,
+        mediaType: 'image/jpeg',
+      };
+    });
+
+    texts.forEach((text, id) => {
+      result[id.toString()] = {
+        id,
+        type: 'text',
+        content: text,
+      };
+    });
+
+    return result;
+  };
+
   // Handle submit on Enter key
-  const handleSubmit = (value: string) => {
+  const handleSubmit = async (value: string) => {
 
     // Don't submit empty messages
     if (!value.trim()) return;
@@ -178,9 +231,30 @@ export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat,
     // Keep the original value for display (with placeholders)
     const displayValue = value;
 
+    // Merge current pasted content with restored content from history
+    const mergedImages = new Map(pastedImages);
+    const mergedTexts = new Map(pastedTexts);
+
+    // Add restored content from history
+    const restorePromises = Object.entries(restoredPastedContents).map(async ([idStr, content]) => {
+      const id = parseInt(idStr);
+      if (content.type === 'image') {
+        // Save base64 to temp file
+        const imageData = await saveClipboardImage(content.content, id);
+        if (imageData) {
+          mergedImages.set(id, imageData);
+        }
+      } else if (content.type === 'text') {
+        mergedTexts.set(id, content.content);
+      }
+    });
+
+    // Wait for all restored images to be saved
+    await Promise.all(restorePromises);
+
     // Create API version with expanded paths
-    let apiValue = expandTextPastes(value, pastedTexts);
-    apiValue = expandImagePastes(apiValue, pastedImages, true);
+    let apiValue = expandTextPastes(value, mergedTexts);
+    apiValue = expandImagePastes(apiValue, mergedImages, true);
 
     // Special case: Handle "exit" and "quit" as /exit command
     const trimmedValue = value.trim().toLowerCase();
@@ -218,21 +292,37 @@ export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat,
         executeCommand(command, args);
       } else {
         // Unknown command - send as regular message
+        // Add to history asynchronously
+        addToHistory({
+          display: displayValue.trim(),
+          pastedContents: buildPastedContents(pastedImages, pastedTexts),
+        }).catch(error => {
+          console.error('Failed to save command to history:', error);
+        });
         onSubmit(apiValue.trim(), displayValue.trim());
       }
     } else {
       // Regular message - send API version with expanded paths, display version with placeholders
+      // Add to history asynchronously
+      addToHistory({
+        display: displayValue.trim(),
+        pastedContents: buildPastedContents(pastedImages, pastedTexts),
+      }).catch(error => {
+        console.error('Failed to save command to history:', error);
+      });
       onSubmit(apiValue.trim(), displayValue.trim());
     }
 
     setInputValue('');
     setSuggestions([]);
+    resetHistory();
     // Clear paste data after submit
     setPastedTexts(new Map());
     setPastedImages(new Map());
+    setRestoredPastedContents({});
   };
 
-  const handleInputChange = (value: string) => {
+  const handleInputChange = async (value: string) => {
     // Check if the pasted content is an image file path (from Finder drag & drop)
     const imageExtensions = /\.(png|jpg|jpeg|gif|bmp|webp)$/i;
 
@@ -244,17 +334,29 @@ export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat,
         const placeholder = formatImagePlaceholder(imageCounter);
         const filePath = newPart.trim();
 
-        // Store the file path with relative path conversion
-        const relativePath = toRelativePathIfPossible(filePath);
-        setPastedImages(prev => new Map(prev).set(imageCounter, {
-          base64: '',
-          filePath: relativePath
-        }));
+        // Read file and convert to base64
+        try {
+          // Unescape spaces and other escaped characters in the file path
+          const unescapedPath = filePath.replace(/\\ /g, ' ');
+          const absolutePath = resolve(unescapedPath);
+          const fileBuffer = await readFile(absolutePath);
+          const base64Data = fileBuffer.toString('base64');
 
-        const newValue = inputValue + placeholder;
-        setInputValue(newValue);
-        setImageCounter(prev => prev + 1);
-        return;
+          // Store with base64 data (using unescaped path)
+          const relativePath = toRelativePathIfPossible(unescapedPath);
+          setPastedImages(prev => new Map(prev).set(imageCounter, {
+            base64: base64Data,
+            filePath: relativePath
+          }));
+
+          const newValue = inputValue + placeholder;
+          setInputValue(newValue);
+          setImageCounter(prev => prev + 1);
+          return;
+        } catch (error) {
+          console.error('Failed to read image file:', error);
+          // Fall through to just set the value
+        }
       }
     }
 
