@@ -16,11 +16,7 @@ const packageJson = JSON.parse(
 	fs.readFileSync(path.join(__dirname, '../../../../package.json'), 'utf8'),
 );
 
-interface HeaderProps {
-  version?: string;
-}
-
-export const AppHeader: React.FC<HeaderProps> = () => {
+export const AppHeader: React.FC = () => {
 	const boxWidth = useTerminalWidth();
 	const {colors} = useTheme();
 

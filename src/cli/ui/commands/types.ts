@@ -67,6 +67,9 @@ export interface SlashCommand {
   // Whether to hide from suggestions
   hidden?: boolean;
 
+  // Whether this command expects arguments (for smart Enter behavior)
+  expectsArgs?: boolean;
+
   // The action to execute
   action?: (
     context: CommandContext,

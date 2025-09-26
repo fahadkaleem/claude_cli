@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
-import TextInput from 'ink-text-input';
+import TextInput from './TextInput.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import { commandService } from '../../../services/CommandService.js';
 import { registerBuiltInCommands } from '../commands/registerCommands.js';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts.js';
 import { useDialog } from '../contexts/DialogContext.js';
 import { useTheme } from '../hooks/useTheme.js';
+import { useTerminalWidth } from '../hooks/useTerminalWidth.js';
 import type { SlashCommand } from '../commands/types.js';
 
 interface InputPromptProps {
@@ -24,8 +25,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat,
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState<SlashCommand[]>([]);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
+  const [cursorOffset, setCursorOffset] = useState(0);
   const { openDialog } = useDialog();
   const { colors } = useTheme();
+  const columns = useTerminalWidth();
 
   // Use keyboard shortcuts hook
   const { escapeCount, showEscapeHint } = useKeyboardShortcuts({
@@ -74,8 +77,28 @@ export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat,
         // Tab accepts the suggestion and puts it in the input field
         const selected = suggestions[selectedSuggestionIndex];
         if (selected) {
-          setInputValue('/' + selected.name + ' ');
+          const newValue = '/' + selected.name + ' ';
+          setInputValue(newValue);
+          setCursorOffset(newValue.length);
           setSuggestions([]);
+        }
+        return;
+      } else if (key.return) {
+        // Enter: execute if no args needed, otherwise fill like Tab
+        const selected = suggestions[selectedSuggestionIndex];
+        if (selected) {
+          if (selected.expectsArgs) {
+            // Command expects args, just fill it in
+            const newValue = '/' + selected.name + ' ';
+            setInputValue(newValue);
+            setCursorOffset(newValue.length);
+            setSuggestions([]);
+          } else {
+            // No args needed, execute immediately
+            executeCommand(selected, '');
+            setInputValue('');
+            setSuggestions([]);
+          }
         }
         return;
       }
@@ -208,6 +231,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat,
           onChange={handleInputChange}
           onSubmit={handleSubmit}
           focus={true}
+          columns={columns - 6}
+          cursorOffset={cursorOffset}
+          onChangeCursorOffset={setCursorOffset}
+          disableCursorMovementForUpDownKeys={suggestions.length > 0}
+          multiline={false}
         />
       </Box>
 

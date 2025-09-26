@@ -4,6 +4,7 @@ export const themeCommand: SlashCommand = {
   name: 'theme',
   description: 'Change the UI theme',
   category: CommandCategory.SYSTEM,
+  expectsArgs: false,
 
   action: (context, args) => {
     return {
