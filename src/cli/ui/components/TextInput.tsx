@@ -90,12 +90,22 @@ export type Props = {
   /**
    * Optional callback when an image is pasted
    */
-  readonly onImagePaste?: (base64Image: string) => void
+  readonly onImagePaste?: (base64Image: string, imageNumber: number) => void
+
+  /**
+   * Current image counter for numbering pasted images
+   */
+  readonly imageCounter?: number
 
   /**
    * Optional callback when a large text (over 800 chars) is pasted
    */
-  readonly onPaste?: (text: string) => void
+  readonly onPaste?: (text: string, pasteNumber: number) => void
+
+  /**
+   * Current paste counter for numbering pasted text
+   */
+  readonly pasteCounter?: number
 
   /**
    * Whether the input is dimmed and non-interactive
@@ -133,7 +143,9 @@ export default function TextInput({
   onHistoryReset,
   columns,
   onImagePaste,
+  imageCounter = 1,
   onPaste,
+  pasteCounter = 1,
   isDimmed = false,
   disableCursorMovementForUpDownKeys = false,
   cursorOffset,
@@ -160,6 +172,7 @@ export default function TextInput({
     themeText: (text: string) => chalk.hex(colors.primary)(text),
     columns,
     onImagePaste,
+    imageCounter,
     disableCursorMovementForUpDownKeys,
     externalOffset: cursorOffset,
     onOffsetChange: onChangeCursorOffset,
@@ -181,7 +194,7 @@ export default function TextInput({
       setPasteState(({ chunks }) => {
         const pastedText = chunks.join('')
         // Schedule callback after current render to avoid state updates during render
-        Promise.resolve().then(() => onPaste!(pastedText))
+        Promise.resolve().then(() => onPaste!(pastedText, pasteCounter))
         return { chunks: [], timeoutId: null }
       })
     }, 100)

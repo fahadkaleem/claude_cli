@@ -35,6 +35,16 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({ toolCall }) => {
     }
   };
 
+  // Check if we should hide this tool call completely
+  const shouldHideToolCall = () => {
+    // Hide Read File tool when reading images
+    if (toolCall.name === 'read_file' && toolCall.result?.output) {
+      const output = toolCall.result.output as any;
+      return output && typeof output === 'object' && output.type === 'image';
+    }
+    return false;
+  };
+
   // Check if we should show full display content for this tool
   const shouldShowFullDisplay = () => {
     return toolCall.name === 'write_tasks' && toolCall.result?.display?.content;
@@ -56,6 +66,11 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({ toolCall }) => {
   };
 
   const resultSummary = getResultSummary();
+
+  // Hide tool call completely if needed (e.g., image reads)
+  if (shouldHideToolCall()) {
+    return null;
+  }
 
   // For TodoWrite tool, only show the full display content
   if (shouldShowFullDisplay() && toolCall.result?.display?.content) {

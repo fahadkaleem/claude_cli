@@ -264,11 +264,35 @@ export class ChatService {
         }
 
         // Build tool results as user message content
-        const toolResultContent = executedToolCalls.map(call => ({
-          type: 'tool_result' as const,
-          tool_use_id: call.id,
-          content: call.result?.output ? JSON.stringify(call.result.output) : 'No output'
-        }));
+        const toolResultContent = executedToolCalls.map(call => {
+          const output = call.result?.output;
+
+          // Handle image output
+          if (output && typeof output === 'object' && 'type' in output && output.type === 'image') {
+            const imageOutput = output as { type: 'image'; base64: string; mediaType: string };
+            return {
+              type: 'tool_result' as const,
+              tool_use_id: call.id,
+              content: [
+                {
+                  type: 'image' as const,
+                  source: {
+                    type: 'base64' as const,
+                    media_type: imageOutput.mediaType as any,
+                    data: imageOutput.base64,
+                  },
+                },
+              ],
+            };
+          }
+
+          // Handle regular text output
+          return {
+            type: 'tool_result' as const,
+            tool_use_id: call.id,
+            content: output ? JSON.stringify(output) : 'No output',
+          };
+        });
 
         // Send tool results back to the model
         yield { type: 'thinking' };

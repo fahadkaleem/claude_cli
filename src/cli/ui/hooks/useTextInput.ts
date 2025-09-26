@@ -7,7 +7,9 @@ import {
   CLIPBOARD_ERROR_MESSAGE,
 } from '../utils/imagePaste.js'
 
-const IMAGE_PLACEHOLDER = '[Image pasted]'
+function getImagePlaceholder(imageNumber: number): string {
+  return `[Image #${imageNumber}]`
+}
 
 type MaybeCursor = void | Cursor
 type InputHandler = (input: string) => MaybeCursor
@@ -37,7 +39,8 @@ type UseTextInputProps = {
   invert: (text: string) => string
   themeText: (text: string) => string
   columns: number
-  onImagePaste?: (base64Image: string) => void
+  onImagePaste?: (base64Image: string, imageNumber: number) => void
+  imageCounter?: number
   disableCursorMovementForUpDownKeys?: boolean
   externalOffset: number
   onOffsetChange: (offset: number) => void
@@ -66,6 +69,7 @@ export function useTextInput({
   invert,
   columns,
   onImagePaste,
+  imageCounter = 1,
   disableCursorMovementForUpDownKeys = false,
   externalOffset,
   onOffsetChange,
@@ -146,8 +150,8 @@ export function useTextInput({
       return cursor
     }
 
-    onImagePaste?.(base64Image)
-    return cursor.insert(IMAGE_PLACEHOLDER)
+    onImagePaste?.(base64Image, imageCounter)
+    return cursor.insert(getImagePlaceholder(imageCounter))
   }
 
   const handleCtrl = mapInput([

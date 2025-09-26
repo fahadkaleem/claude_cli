@@ -1,5 +1,5 @@
-import { readFileSync } from 'fs';
-import { resolve, isAbsolute } from 'path';
+import { readFileSync, statSync } from 'fs';
+import { resolve, isAbsolute, extname } from 'path';
 import { Tool } from '../../core/Tool.js';
 import { ToolKind, ToolErrorType, type ToolResult, type ToolContext } from '../../core/types.js';
 
@@ -7,10 +7,102 @@ import { ToolKind, ToolErrorType, type ToolResult, type ToolContext } from '../.
 const MAX_LINES = 2000;
 const MAX_LINE_LENGTH = 2000;
 
+// Image handling constants
+const IMAGE_EXTENSIONS = new Set([
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.bmp',
+  '.webp',
+]);
+
+const MAX_WIDTH = 2000;
+const MAX_HEIGHT = 2000;
+const MAX_IMAGE_SIZE = 3.75 * 1024 * 1024; // 5MB in bytes, accounting for base64 encoding
+
 interface ReadToolParams extends Record<string, unknown> {
   file_path: string;
   offset?: number;
   limit?: number;
+}
+
+/**
+ * Reads and processes an image file, resizing if necessary
+ */
+async function readImage(filePath: string, ext: string): Promise<{
+  base64: string;
+  mediaType: string;
+}> {
+  try {
+    const stats = statSync(filePath);
+    const sharp = (await import('sharp')).default;
+    const image = sharp(readFileSync(filePath));
+    const metadata = await image.metadata();
+
+    const width = metadata.width || 0;
+    const height = metadata.height || 0;
+
+    // Check if the original file is already within limits
+    if (
+      stats.size <= MAX_IMAGE_SIZE &&
+      width <= MAX_WIDTH &&
+      height <= MAX_HEIGHT
+    ) {
+      // Normalize media type (jpg -> jpeg)
+      const normalizedExt = ext.slice(1) === 'jpg' ? 'jpeg' : ext.slice(1);
+      return {
+        base64: readFileSync(filePath).toString('base64'),
+        mediaType: `image/${normalizedExt}`,
+      };
+    }
+
+    // Calculate new dimensions while maintaining aspect ratio
+    let newWidth = width;
+    let newHeight = height;
+
+    if (newWidth > MAX_WIDTH) {
+      newHeight = Math.round((newHeight * MAX_WIDTH) / newWidth);
+      newWidth = MAX_WIDTH;
+    }
+
+    if (newHeight > MAX_HEIGHT) {
+      newWidth = Math.round((newWidth * MAX_HEIGHT) / newHeight);
+      newHeight = MAX_HEIGHT;
+    }
+
+    // Resize image
+    const resizedImageBuffer = await image
+      .resize(newWidth, newHeight, {
+        fit: 'inside',
+        withoutEnlargement: true,
+      })
+      .toBuffer();
+
+    // If still too large after resize, compress quality
+    if (resizedImageBuffer.length > MAX_IMAGE_SIZE) {
+      const compressedBuffer = await image.jpeg({ quality: 80 }).toBuffer();
+      return {
+        base64: compressedBuffer.toString('base64'),
+        mediaType: 'image/jpeg',
+      };
+    }
+
+    // Normalize media type (jpg -> jpeg)
+    const normalizedExt = ext.slice(1) === 'jpg' ? 'jpeg' : ext.slice(1);
+    return {
+      base64: resizedImageBuffer.toString('base64'),
+      mediaType: `image/${normalizedExt}`,
+    };
+  } catch (error) {
+    console.error('Error processing image:', error);
+    // Fallback to original image
+    const normalizedExt = ext.slice(1) === 'jpg' ? 'jpeg' : ext.slice(1);
+    return {
+      base64: readFileSync(filePath).toString('base64'),
+      mediaType: `image/${normalizedExt}`,
+    };
+  }
 }
 
 /**
@@ -135,7 +227,26 @@ Input schema: {'type': 'object', 'properties': {'file_path': {'type': 'string', 
       // Show progress
       context?.onProgress?.(`Reading ${absolutePath}...`);
 
-      // Read the file
+      // Check if it's an image file
+      const ext = extname(absolutePath).toLowerCase();
+      if (IMAGE_EXTENSIONS.has(ext)) {
+        const imageData = await readImage(absolutePath, ext);
+
+        return {
+          success: true,
+          output: {
+            type: 'image',
+            base64: imageData.base64,
+            mediaType: imageData.mediaType,
+          },
+          display: {
+            type: 'markdown',
+            content: `## Image: ${file_path}\n\nRead image successfully`,
+          },
+        };
+      }
+
+      // Read the file as text
       const content = readFileSync(absolutePath, 'utf-8');
       const lines = content.split('\n');
       const totalLines = lines.length;

@@ -108,11 +108,19 @@ export const MessageList: React.FC<MessageListProps> = ({
     // Add tool calls as separate items after the message
     if (message.toolCalls && message.toolCalls.length > 0) {
       message.toolCalls.forEach((toolCall, toolIndex) => {
-        messageElements.push(
-          <Box key={`msg-${index}-tool-${toolIndex}`} marginBottom={1}>
-            <ToolMessage toolCall={toolCall} />
-          </Box>
-        );
+        // Check if this is an image read that should be hidden
+        const isImageRead = toolCall.name === 'read_file' &&
+                           toolCall.result?.output &&
+                           (toolCall.result.output as any).type === 'image';
+
+        // Only add the Box wrapper if we're actually showing the tool
+        if (!isImageRead) {
+          messageElements.push(
+            <Box key={`msg-${index}-tool-${toolIndex}`} marginBottom={1}>
+              <ToolMessage toolCall={toolCall} />
+            </Box>
+          );
+        }
       });
     }
   });

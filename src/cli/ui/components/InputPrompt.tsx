@@ -9,6 +9,16 @@ import { useDialog } from '../contexts/DialogContext.js';
 import { useTheme } from '../hooks/useTheme.js';
 import { useTerminalWidth } from '../hooks/useTerminalWidth.js';
 import type { SlashCommand } from '../commands/types.js';
+import {
+  saveClipboardImage,
+  cleanupOldClipboardImages,
+  formatTextPastePlaceholder,
+  formatImagePlaceholder,
+  expandTextPastes,
+  expandImagePastes,
+  toRelativePathIfPossible,
+  type ImageData
+} from '../utils/clipboardUtils.js';
 
 interface InputPromptProps {
   onSubmit: (value: string) => void;
@@ -26,6 +36,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat,
   const [suggestions, setSuggestions] = useState<SlashCommand[]>([]);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
   const [cursorOffset, setCursorOffset] = useState(0);
+  const [pasteCounter, setPasteCounter] = useState(1);
+  const [imageCounter, setImageCounter] = useState(1);
+  const [pastedImages, setPastedImages] = useState<Map<number, ImageData>>(new Map());
+  const [pastedTexts, setPastedTexts] = useState<Map<number, string>>(new Map());
   const { openDialog } = useDialog();
   const { colors } = useTheme();
   const columns = useTerminalWidth();
@@ -161,6 +175,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat,
     // Don't submit empty messages
     if (!value.trim()) return;
 
+    // Replace placeholders with actual content
+    let processedValue = expandTextPastes(value, pastedTexts);
+    processedValue = expandImagePastes(processedValue, pastedImages, true);
+
     // Special case: Handle "exit" and "quit" as /exit command
     const trimmedValue = value.trim().toLowerCase();
     if (trimmedValue === 'exit' || trimmedValue === 'quit') {
@@ -197,19 +215,78 @@ export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat,
         executeCommand(command, args);
       } else {
         // Unknown command - send as regular message
-        onSubmit(value.trim());
+        onSubmit(processedValue.trim());
       }
     } else {
-      // Regular message
-      onSubmit(value.trim());
+      // Regular message - use processed value with expanded pastes
+      onSubmit(processedValue.trim());
     }
 
     setInputValue('');
     setSuggestions([]);
+    // Clear paste data after submit
+    setPastedTexts(new Map());
+    setPastedImages(new Map());
   };
 
   const handleInputChange = (value: string) => {
+    // Check if the pasted content is an image file path (from Finder drag & drop)
+    const imageExtensions = /\.(png|jpg|jpeg|gif|bmp|webp)$/i;
+
+    // Detect if this is a file path paste (contains image extension)
+    if (imageExtensions.test(value)) {
+      const newPart = value.slice(inputValue.length);
+
+      if (newPart && imageExtensions.test(newPart)) {
+        const placeholder = formatImagePlaceholder(imageCounter);
+        const filePath = newPart.trim();
+
+        // Store the file path with relative path conversion
+        const relativePath = toRelativePathIfPossible(filePath);
+        setPastedImages(prev => new Map(prev).set(imageCounter, {
+          base64: '',
+          filePath: relativePath
+        }));
+
+        const newValue = inputValue + placeholder;
+        setInputValue(newValue);
+        setImageCounter(prev => prev + 1);
+        return;
+      }
+    }
+
     setInputValue(value);
+  };
+
+  const handleTextPaste = (text: string, pasteNumber: number) => {
+    const placeholder = formatTextPastePlaceholder(text, pasteNumber);
+
+    // Store the pasted text
+    setPastedTexts(prev => new Map(prev).set(pasteNumber, text));
+
+    const newInput = inputValue.slice(0, cursorOffset) + placeholder + inputValue.slice(cursorOffset);
+    setInputValue(newInput);
+    setCursorOffset(cursorOffset + placeholder.length);
+    setPasteCounter(prev => prev + 1);
+  };
+
+  const handleImagePaste = async (base64Image: string, imageNumber: number) => {
+    const imageData = await saveClipboardImage(base64Image, imageNumber);
+
+    if (imageData) {
+      // Successfully saved image
+      setPastedImages(prev => new Map(prev).set(imageNumber, imageData));
+
+      // Cleanup old images asynchronously (fire and forget)
+      cleanupOldClipboardImages().catch(() => {
+        // Ignore cleanup errors
+      });
+    } else {
+      // Failed to save image - could show error to user
+      console.error('Failed to save pasted image');
+    }
+
+    setImageCounter(prev => prev + 1);
   };
 
   return (
@@ -236,6 +313,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat,
           onChangeCursorOffset={setCursorOffset}
           disableCursorMovementForUpDownKeys={suggestions.length > 0}
           multiline={false}
+          onPaste={handleTextPaste}
+          pasteCounter={pasteCounter}
+          onImagePaste={handleImagePaste}
+          imageCounter={imageCounter}
         />
       </Box>
 
