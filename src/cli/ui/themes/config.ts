@@ -1,6 +1,25 @@
 import type { Theme, ThemePreset } from '../types.js';
 
 export const themes: Record<ThemePreset, Theme> = {
+	'alfred': {
+		name: 'alfred',
+		displayName: 'Alfred',
+		colors: {
+			white: '#e0e0e0',
+			black: '#1a1a1a',
+			primary: '#6B50FF',
+			tool: '#FF60FF',
+			success: '#7AF778',
+			error: '#ff6b6b',
+			secondary: '#888888',
+			info: '#bb9af7',
+			warning: '#ffa726',
+			diffAdded: '#2d4a1e',
+			diffRemoved: '#4a1e2d',
+			diffAddedText: '#7AF778',
+			diffRemovedText: '#ff6b6b',
+		},
+	},
 	'tokyo-night': {
 		name: 'tokyo-night',
 		displayName: 'Tokyo Night',
@@ -296,4 +315,4 @@ export function getThemeColors(themePreset: ThemePreset) {
 	return themes[themePreset].colors;
 }
 
-export const defaultTheme: ThemePreset = 'tokyo-night';
+export const defaultTheme: ThemePreset = 'alfred';

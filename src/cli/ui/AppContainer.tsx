@@ -8,6 +8,7 @@ import { getThemeColors } from './themes/config.js';
 import { UIStateContext } from './contexts/UIStateContext.js';
 import { UIActionsContext } from './contexts/UIActionsContext.js';
 import { DialogProvider, useDialog } from './contexts/DialogContext.js';
+import { SettingsProvider } from './contexts/SettingsContext.js';
 
 interface AppContainerProps {
   model?: string;
@@ -77,13 +78,15 @@ const AppContainerContent: React.FC<AppContainerProps> = ({ model }) => {
   );
 
   return (
-    <ThemeContext.Provider value={themeContextValue}>
-      <UIStateContext.Provider value={uiState}>
-        <UIActionsContext.Provider value={uiActions}>
-          <App />
-        </UIActionsContext.Provider>
-      </UIStateContext.Provider>
-    </ThemeContext.Provider>
+    <SettingsProvider>
+      <ThemeContext.Provider value={themeContextValue}>
+        <UIStateContext.Provider value={uiState}>
+          <UIActionsContext.Provider value={uiActions}>
+            <App />
+          </UIActionsContext.Provider>
+        </UIStateContext.Provider>
+      </ThemeContext.Provider>
+    </SettingsProvider>
   );
 };
 

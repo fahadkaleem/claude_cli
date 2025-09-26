@@ -1,9 +1,12 @@
 import React, { createContext, useContext, useState } from 'react';
 
+export type ThinkingAnimationStyle = 'default' | 'braille' | 'japanese';
+
 interface Settings {
   showFooter: boolean;
   showHeader: boolean;
   model: string;
+  thinkingAnimationStyle: ThinkingAnimationStyle;
 }
 
 interface SettingsContextValue {
@@ -14,7 +17,8 @@ interface SettingsContextValue {
 const defaultSettings: Settings = {
   showFooter: false,
   showHeader: false,
-  model: 'claude-sonnet-4-20250514'
+  model: 'claude-sonnet-4-20250514',
+  thinkingAnimationStyle: 'braille'
 };
 
 const SettingsContext = createContext<SettingsContextValue | undefined>(undefined);

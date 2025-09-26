@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState} from 'react';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import {useTheme} from '../hooks/useTheme.js';
@@ -23,7 +23,6 @@ export function ThemeSelector({
 	const boxWidth = useTerminalWidth();
 	const {colors, currentTheme, setCurrentTheme} = useTheme();
 	const [originalTheme] = useState(currentTheme);
-	const [currentIndex, setCurrentIndex] = useState(0);
 
 	useInput((_, key) => {
 		if (key.escape) {
@@ -38,12 +37,10 @@ export function ThemeSelector({
 		value: theme.name as ThemePreset,
 	}));
 
-	useEffect(() => {
-		const index = themeOptions.findIndex(
-			option => option.value === originalTheme,
-		);
-		setCurrentIndex(index >= 0 ? index : 0);
-	}, []);
+	const initialIndex = themeOptions.findIndex(
+		option => option.value === originalTheme,
+	);
+	const safeInitialIndex = initialIndex >= 0 ? initialIndex : 0;
 
 	const handleSelect = (item: ThemeOption) => {
 		onThemeSelect(item.value);
@@ -52,6 +49,8 @@ export function ThemeSelector({
 	const handleHighlight = (item: ThemeOption) => {
 		setCurrentTheme(item.value);
 	};
+
+	const currentlyHighlightedTheme = themes[currentTheme];
 
 	return (
 		<Box
@@ -63,10 +62,13 @@ export function ThemeSelector({
 			marginBottom={1}
 		>
 			<Box flexDirection="column">
-				<Box marginBottom={1}>
-					<Text color={colors.secondary}>
-						Select a theme (current: {themes[currentTheme].displayName})
-					</Text>
+				<Box marginBottom={1} flexDirection="row">
+					<Box width="45%">
+						<Text color={colors.secondary}>Select Theme</Text>
+					</Box>
+					<Box width="55%" paddingLeft={2}>
+						<Text color={colors.secondary}>Color Palette</Text>
+					</Box>
 				</Box>
 
 				<Box marginBottom={1}>
@@ -75,17 +77,31 @@ export function ThemeSelector({
 					</Text>
 				</Box>
 
-				<Box marginBottom={1}>
-					<Text color={colors.info}>
-						The entire CLI will change as you navigate. Try it out!
-					</Text>
-				</Box>
+				<Box flexDirection="row">
+					<Box width="45%" flexDirection="column">
+						<SelectInput
+							items={themeOptions}
+							onSelect={handleSelect}
+							onHighlight={handleHighlight}
+							initialIndex={safeInitialIndex}
+						/>
+					</Box>
 
-				<SelectInput
-					items={themeOptions}
-					onSelect={handleSelect}
-					onHighlight={handleHighlight}
-				/>
+					<Box width="55%" paddingLeft={2} flexDirection="column" borderStyle="single" borderColor={colors.secondary} paddingX={1} paddingY={1}>
+						<Box>
+							<Text color={currentlyHighlightedTheme.colors.primary}>██ Primary</Text>
+						</Box>
+						<Box>
+							<Text color={currentlyHighlightedTheme.colors.secondary}>██ Secondary</Text>
+						</Box>
+						<Box>
+							<Text color={currentlyHighlightedTheme.colors.tool}>██ Tool</Text>
+						</Box>
+						<Box>
+							<Text color={currentlyHighlightedTheme.colors.info}>██ Info</Text>
+						</Box>
+					</Box>
+				</Box>
 			</Box>
 		</Box>
 	);

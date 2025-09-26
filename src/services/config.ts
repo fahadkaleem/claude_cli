@@ -16,7 +16,8 @@ export const getConfig = (): Config => {
 
   return {
     apiKey,
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-3-5-haiku-latest',
     maxTokens: 4096
   };
 };
+//claude-sonnet-4-20250514

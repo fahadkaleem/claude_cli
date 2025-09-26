@@ -49,6 +49,7 @@ export interface Theme {
 }
 
 export type ThemePreset =
+	| 'alfred'
 	| 'tokyo-night'
 	| 'synthwave-84'
 	| 'forest-night'

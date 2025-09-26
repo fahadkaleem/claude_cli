@@ -1,7 +1,7 @@
 import React from 'react';
-import { Box, Text } from 'ink';
-import Spinner from 'ink-spinner';
+import { ThinkingAnimation } from '../../../ui/components/ThinkingAnimation.js';
 import { useTheme } from '../hooks/useTheme.js';
+import { useSettings } from '../contexts/SettingsContext.js';
 
 interface LoadingIndicatorProps {
   text?: string;
@@ -11,12 +11,17 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   text = 'Thinking...'
 }) => {
   const { colors } = useTheme();
+  const { settings } = useSettings();
+
   return (
-    <Box>
-      <Text color={colors.primary}>
-        <Spinner type="dots" />
-      </Text>
-      <Text color={colors.secondary}> {text}</Text>
-    </Box>
+    <ThinkingAnimation
+      size={24}
+      label={text}
+      labelColor={colors.tool}
+      gradColorA={colors.primary}
+      gradColorB={colors.tool}
+      cycleColors={true}
+      runeSet={settings.thinkingAnimationStyle}
+    />
   );
 };

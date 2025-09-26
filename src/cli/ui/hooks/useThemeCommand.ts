@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import type { ThemePreset } from '../types.js';
+import { defaultTheme } from '../themes/config.js';
 
 interface UseThemeCommandReturn {
   currentTheme: ThemePreset;
@@ -10,7 +11,7 @@ interface UseThemeCommandReturn {
 export const useThemeCommand = (
   onThemeChange?: (theme: ThemePreset) => void
 ): UseThemeCommandReturn => {
-  const [currentTheme, setCurrentTheme] = useState<ThemePreset>('tokyo-night');
+  const [currentTheme, setCurrentTheme] = useState<ThemePreset>(defaultTheme);
 
   const handleThemeSelect = useCallback((theme: ThemePreset) => {
     setCurrentTheme(theme);

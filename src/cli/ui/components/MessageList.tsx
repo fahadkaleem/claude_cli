@@ -1,10 +1,12 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import Spinner from 'ink-spinner';
 import Markdown from '@inkkit/ink-markdown';
 import { Message } from '../types';
 import { ToolMessage } from '../../../tools/ui/ToolMessage.js';
-import { MessageIndicators, Colors, DisplayType, LoadingMessages, SpinnerType, InterruptedIndicator } from '../constants.js';
+import { MessageIndicators, Colors, DisplayType, LoadingMessages, InterruptedIndicator } from '../constants.js';
+import { ThinkingAnimation } from '../../../ui/components/ThinkingAnimation.js';
+import { useSettings } from '../contexts/SettingsContext.js';
+import { useTheme } from '../hooks/useTheme.js';
 
 interface MessageListProps {
   messages: Message[];
@@ -28,6 +30,8 @@ export const MessageList: React.FC<MessageListProps> = ({
   messages,
   isLoading
 }) => {
+  const { settings } = useSettings();
+  const { colors } = useTheme();
   // Build a flat list of messages and tool calls in order
   const messageElements: React.ReactNode[] = [];
 
@@ -119,10 +123,15 @@ export const MessageList: React.FC<MessageListProps> = ({
 
       {isLoading && (
         <Box>
-          <Text color={Colors.Loading}>
-            <Spinner type={SpinnerType.Default} />
-          </Text>
-          <Text> {LoadingMessages.Thinking}</Text>
+          <ThinkingAnimation
+            size={24}
+            label={LoadingMessages.Thinking}
+            labelColor={colors.primary}
+            gradColorA={colors.primary}
+            gradColorB={colors.info}
+            cycleColors={true}
+            runeSet={settings.thinkingAnimationStyle}
+          />
         </Box>
       )}
     </Box>

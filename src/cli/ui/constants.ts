@@ -9,7 +9,7 @@ export const MessageIndicators = {
 } as const;
 
 export const Colors = {
-  User: 'cyan',
+  User: 'white',
   Assistant: 'white',
   Tool: {
     Pending: 'yellow',
