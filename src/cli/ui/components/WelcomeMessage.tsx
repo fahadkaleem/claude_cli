@@ -1,8 +1,10 @@
-import React from 'react';
+import React, {memo} from 'react';
 import {TitledBox, titleStyles} from '@mishieck/ink-titled-box';
 import {Box, Text} from 'ink';
+
 import {useTheme} from '../hooks/useTheme.js';
 import {useTerminalWidth} from '../hooks/useTerminalWidth.js';
+
 import fs from 'fs';
 import path from 'path';
 import {fileURLToPath} from 'url';
@@ -12,15 +14,12 @@ import Gradient from 'ink-gradient';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Read package.json once at module load time to avoid repeated file reads
 const packageJson = JSON.parse(
 	fs.readFileSync(path.join(__dirname, '../../../../package.json'), 'utf8'),
 );
 
-interface HeaderProps {
-  version?: string;
-}
-
-export const AppHeader: React.FC<HeaderProps> = () => {
+export default memo(function WelcomeMessage() {
 	const boxWidth = useTerminalWidth();
 	const {colors} = useTheme();
 
@@ -63,4 +62,4 @@ export const AppHeader: React.FC<HeaderProps> = () => {
 			</TitledBox>
 		</>
 	);
-};
+});

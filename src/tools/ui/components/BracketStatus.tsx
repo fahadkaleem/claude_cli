@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { getStatusInfo, type TaskStatus } from '../constants/taskIndicators.js';
+import { useTheme } from '../../../cli/ui/hooks/useTheme.js';
 
 interface BracketStatusProps {
   /** The current status to display */
@@ -23,7 +24,8 @@ export const BracketStatus: React.FC<BracketStatusProps> = ({
   label,
   showText = false
 }) => {
-  const { indicator, color, label: statusLabel } = getStatusInfo(status);
+  const { colors } = useTheme();
+  const { indicator, color, label: statusLabel } = getStatusInfo(status, colors);
 
   return (
     <Box gap={1}>

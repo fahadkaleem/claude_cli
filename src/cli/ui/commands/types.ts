@@ -38,7 +38,7 @@ export interface PromptActionReturn {
 
 export interface DialogActionReturn {
   type: 'dialog';
-  dialog: 'help' | 'settings' | 'about' | 'model';
+  dialog: 'help' | 'settings' | 'about' | 'model' | 'theme-select';
 }
 
 export type CommandActionReturn =
@@ -91,5 +91,6 @@ export enum CommandCategory {
   CHAT = 'chat',
   SETTINGS = 'settings',
   DEBUG = 'debug',
-  HELP = 'help'
+  HELP = 'help',
+  SYSTEM = 'system'
 }

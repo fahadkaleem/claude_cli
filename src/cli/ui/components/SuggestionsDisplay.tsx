@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Text } from 'ink';
 import { SlashCommand } from '../commands/types.js';
+import { useTheme } from '../hooks/useTheme.js';
 
 interface SuggestionsDisplayProps {
   suggestions: SlashCommand[];
@@ -16,6 +17,7 @@ export const SuggestionsDisplay: React.FC<SuggestionsDisplayProps> = ({
   maxVisible = MAX_SUGGESTIONS_TO_SHOW
 }) => {
   const [scrollOffset, setScrollOffset] = useState(0);
+  const { colors } = useTheme();
 
   // Auto-scroll to keep selected item visible
   useEffect(() => {
@@ -55,12 +57,12 @@ export const SuggestionsDisplay: React.FC<SuggestionsDisplayProps> = ({
         return (
           <Box key={command.name} flexDirection="row">
             <Box width={commandColumnWidth}>
-              <Text color={isActive ? 'cyan' : 'white'}>
+              <Text color={isActive ? colors.primary : colors.white}>
                 {commandText}
               </Text>
             </Box>
             <Box flexGrow={1}>
-              <Text color={isActive ? 'cyan' : 'gray'} wrap="wrap">
+              <Text color={isActive ? colors.primary : colors.secondary} wrap="wrap">
                 {command.description}
               </Text>
             </Box>

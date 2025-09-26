@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import Markdown from '@inkkit/ink-markdown';
 import { DisplayType, type DisplayTypeValue } from '../constants.js';
+import { useTheme } from '../hooks/useTheme.js';
 
 interface MessageContentProps {
   content: string;
@@ -20,6 +21,7 @@ export const MessageContent: React.FC<MessageContentProps> = ({
   color,
   prefix,
 }) => {
+  const { colors } = useTheme();
   // Content renderers map
   const contentRenderers = {
     [DisplayType.Markdown]: () => <Markdown>{content}</Markdown>,
@@ -31,7 +33,7 @@ export const MessageContent: React.FC<MessageContentProps> = ({
         return <Text>{content}</Text>;
       }
     },
-    [DisplayType.Error]: () => <Text color="red">{content}</Text>,
+    [DisplayType.Error]: () => <Text color={colors.error}>{content}</Text>,
     [DisplayType.Text]: () => <Text color={color}>{content}</Text>,
   };
 

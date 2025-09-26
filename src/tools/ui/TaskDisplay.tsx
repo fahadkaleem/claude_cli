@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import { getStatusFromIndicator, TASK_STATUS_COLORS } from './constants/taskIndicators.js';
+import { getStatusFromIndicator, getTaskStatusColors } from './constants/taskIndicators.js';
+import { useTheme } from '../../cli/ui/hooks/useTheme.js';
 
 interface TaskDisplayProps {
   content: string;
@@ -11,6 +12,8 @@ interface TaskDisplayProps {
  * Handles alignment and special formatting for task states
  */
 export const TaskDisplay: React.FC<TaskDisplayProps> = ({ content }) => {
+  const { colors } = useTheme();
+  const statusColors = getTaskStatusColors(colors);
   const lines = content.split('\n');
 
   return (
@@ -21,7 +24,7 @@ export const TaskDisplay: React.FC<TaskDisplayProps> = ({ content }) => {
 
         if (status) {
           // Get the color for this status
-          const color = TASK_STATUS_COLORS[status];
+          const color = statusColors[status];
 
           // Special handling for different statuses
           if (status === 'pending') {

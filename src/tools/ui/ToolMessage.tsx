@@ -2,7 +2,8 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import type { ToolCall } from '../core/types.js';
 import { toolRegistry } from '../core/ToolRegistry.js';
-import { MessageIndicators, Colors } from '../../cli/ui/constants.js';
+import { MessageIndicators } from '../../cli/ui/constants.js';
+import { useTheme } from '../../cli/ui/hooks/useTheme.js';
 import { TaskDisplay } from './TaskDisplay.js';
 
 interface ToolMessageProps {
@@ -10,6 +11,7 @@ interface ToolMessageProps {
 }
 
 export const ToolMessage: React.FC<ToolMessageProps> = ({ toolCall }) => {
+  const { colors } = useTheme();
   // Get the tool instance to access display name and formatters
   const tool = toolRegistry.get(toolCall.name);
   const displayName = tool?.displayName || toolCall.name;
@@ -23,13 +25,13 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({ toolCall }) => {
     switch (toolCall.status) {
       case 'pending':
       case 'executing':
-        return Colors.Tool.Pending;
+        return colors.secondary;
       case 'completed':
-        return Colors.Tool.Completed;
+        return colors.success;
       case 'failed':
-        return Colors.Tool.Failed;
+        return colors.error;
       default:
-        return Colors.Tool.Default;
+        return colors.secondary;
     }
   };
 
@@ -77,8 +79,8 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({ toolCall }) => {
       {/* Result summary with ⎿ branch */}
       {resultSummary && (
         <Box marginLeft={2}>
-          <Text color={Colors.Gray} bold>{MessageIndicators.ToolResult}  </Text>
-          <Text color={Colors.Assistant}>
+          <Text color={colors.secondary} bold>{MessageIndicators.ToolResult}  </Text>
+          <Text color={colors.white}>
             {resultSummary}
           </Text>
         </Box>

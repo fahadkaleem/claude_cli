@@ -3,3 +3,4 @@ examplecode/
 node_modules/
 dist/
 .idea/
+agents.config.json

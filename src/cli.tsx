@@ -2,7 +2,7 @@
 import React from 'react';
 import { render } from 'ink';
 import meow from 'meow';
-import { App } from './cli/ui/components/App.js';
+import { AppContainer } from './cli/ui/AppContainer.js';
 import { promptService } from './services/PromptService.js';
 
 const cli = meow(`
@@ -69,6 +69,6 @@ if (cli.flags.initPrompt) {
       process.exit(1);
     });
 } else {
-  const { waitUntilExit } = render(<App model={cli.flags.model} />);
+  const { waitUntilExit } = render(<AppContainer model={cli.flags.model} />);
   waitUntilExit().catch(console.error);
 }

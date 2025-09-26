@@ -5,6 +5,8 @@ import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import { commandService } from '../../../services/CommandService.js';
 import { registerBuiltInCommands } from '../commands/registerCommands.js';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts.js';
+import { useDialog } from '../contexts/DialogContext.js';
+import { useTheme } from '../hooks/useTheme.js';
 import type { SlashCommand } from '../commands/types.js';
 
 interface InputPromptProps {
@@ -22,6 +24,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat,
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState<SlashCommand[]>([]);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
+  const { openDialog } = useDialog();
+  const { colors } = useTheme();
 
   // Use keyboard shortcuts hook
   const { escapeCount, showEscapeHint } = useKeyboardShortcuts({
@@ -110,6 +114,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat,
             }
           } else if (result.type === 'prompt') {
             onSubmit(result.content);
+          } else if (result.type === 'dialog') {
+            openDialog(result.dialog);
           }
         }
       } catch (error) {
@@ -188,15 +194,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat,
       {/* Show escape hint when first ESC is pressed */}
       {showEscapeHint && (
         <Box marginBottom={1}>
-          <Text color="yellow" dimColor>
+          <Text color={colors.warning} dimColor>
             Press ESC again to clear input
           </Text>
         </Box>
       )}
 
       {/* Input box with rounded corners */}
-      <Box borderStyle="round" borderColor="gray" paddingX={1}>
-        <Text color="gray" bold>{'> '}</Text>
+      <Box borderStyle="round" borderColor={colors.secondary} paddingX={1}>
+        <Text color={colors.secondary} bold>{'> '}</Text>
         <TextInput
           value={inputValue}
           onChange={handleInputChange}

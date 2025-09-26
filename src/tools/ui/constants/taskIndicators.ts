@@ -2,6 +2,7 @@
  * Single source of truth for task status indicators
  * Used across TaskWriteTool, TaskDisplay, and BracketStatus components
  */
+import type { Colors } from '../../../cli/ui/types.js';
 
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 
@@ -12,12 +13,13 @@ export const TASK_STATUS_INDICATORS = {
   cancelled: '[x]'
 } as const;
 
-export const TASK_STATUS_COLORS = {
-  pending: 'gray',
-  in_progress: 'yellow',
-  completed: 'green',
-  cancelled: 'red'
-} as const;
+// Function to get theme-based colors
+export const getTaskStatusColors = (colors: Colors) => ({
+  pending: colors.secondary,
+  in_progress: colors.warning,
+  completed: colors.success,
+  cancelled: colors.error
+});
 
 export const TASK_STATUS_LABELS = {
   pending: 'PENDING',
@@ -37,10 +39,11 @@ export function getStatusFromIndicator(text: string): TaskStatus | null {
 }
 
 // Helper function to get complete status info
-export function getStatusInfo(status: TaskStatus) {
+export function getStatusInfo(status: TaskStatus, colors: Colors) {
+  const statusColors = getTaskStatusColors(colors);
   return {
     indicator: TASK_STATUS_INDICATORS[status],
-    color: TASK_STATUS_COLORS[status],
+    color: statusColors[status],
     label: TASK_STATUS_LABELS[status]
   };
 }
