@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Box, Text } from 'ink';
+import Markdown from '@inkkit/ink-markdown';
 import type { ToolCall, ToolResultDisplay, TaskListDisplay } from '../core/types.js';
 import { toolRegistry } from '../core/ToolRegistry.js';
 import { useTheme } from '../../cli/ui/hooks/useTheme.js';
@@ -125,8 +126,8 @@ const DescriptionLine: React.FC<{ statusColor: string; description: string }> = 
   description,
 }) => (
   <Box marginLeft={INDENT_SIZE}>
-    <Text color={statusColor}>{BRANCH_INDICATOR}</Text>
-    <Text> {description}</Text>
+    <Text color={statusColor}>{BRANCH_INDICATOR} </Text>
+    <Markdown>{description}</Markdown>
   </Box>
 );
 

@@ -234,7 +234,7 @@ Input schema: {'type': 'object', 'properties': {'file_path': {'type': 'string', 
 
         return {
           llmContent: `Successfully read image: ${file_path}. Image data processed and available for display.`,
-          returnDisplay: `## Image: ${file_path}\n\nRead image successfully`,
+          returnDisplay: `Read image`,
         };
       }
 
@@ -296,9 +296,12 @@ ${formattedContent}
 \`\`\``;
       }
 
+      const linesShown = endLine - startLine;
+      const summaryText = `Read **${linesShown}** line${linesShown !== 1 ? 's' : ''}`;
+
       return {
-        llmContent: `Successfully read file: ${file_path}. Total lines: ${totalLines}, showing lines ${startLine + 1}-${endLine}${isTruncated ? ' (truncated)' : ''}.`,
-        returnDisplay: displayContent,
+        llmContent: displayContent,
+        returnDisplay: summaryText,
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

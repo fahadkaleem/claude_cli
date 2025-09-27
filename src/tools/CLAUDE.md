@@ -1,241 +1,419 @@
-# Tool System Guide
+# Tools System - Developer Guide
 
-## How to Add a New Tool
+## Architecture Overview
 
-### Step 1: Choose the Category
-- `fetch/` - API calls, weather, web data fetching
-- Create new directories as needed: `filesystem/`, `execution/`, `ai/`, etc.
-
-### Step 2: Create Your Tool Class
-
-```typescript
-import { Tool } from '../../core/Tool.js';
-import { ToolKind, ToolErrorType, type ToolResult, type ToolContext } from '../../core/types.js';
-
-// Define your params interface
-interface MyToolParams extends Record<string, unknown> {
-  param1: string;
-  optionalParam?: number;
-}
-
-export class MyTool extends Tool<MyToolParams> {
-  // Required: API name the assistant will use
-  readonly name = 'my_tool_name';
-
-  // Required: User-friendly display name
-  readonly displayName = 'My Tool';
-
-  // Required: Clear description of what the tool does
-  readonly description = 'Detailed description of tool functionality';
-
-  // Required: Category - use ToolKind.Other if doesn't fit existing
-  readonly kind = ToolKind.Fetch;
-
-  // Required: JSON Schema for parameters
-  readonly inputSchema = {
-    type: 'object' as const,
-    properties: {
-      param1: {
-        type: 'string',
-        description: 'What this parameter does',
-      },
-      optionalParam: {
-        type: 'number',
-        description: 'Optional parameter description',
-      },
-    },
-    required: ['param1'],
-    additionalProperties: false,  // Add this for strict validation
-    $schema: 'http://json-schema.org/draft-07/schema#',  // Add schema version
-  };
-
-  // Optional: Override for cleaner parameter display
-  formatParams(params: MyToolParams): string {
-    return params.param1; // Show just the main param instead of JSON
-  }
-
-  // Optional: Override for one-line result summary
-  summarizeResult(result: ToolResult): string {
-    if (!result.success) {
-      return `Failed: ${result.error?.message}`;
-    }
-    return 'Operation completed successfully';
-  }
-
-  // Required: Implement the tool logic
-  protected async run(params: MyToolParams, context?: ToolContext): Promise<ToolResult> {
-    const { param1, optionalParam } = params;
-
-    // Optional: Show progress
-    context?.onProgress?.(`Processing ${param1}...`);
-
-    try {
-      // Your tool logic here
-      const result = await yourApiCall(param1);
-
-      return {
-        success: true,
-        output: result,
-        display: {
-          type: 'markdown', // or 'text', 'json', 'error'
-          content: `## Result\n\nProcessed: ${result}`,
-        },
-      };
-    } catch (error) {
-      return {
-        success: false,
-        output: null,
-        error: {
-          message: error instanceof Error ? error.message : 'Unknown error',
-          type: ToolErrorType.EXECUTION_FAILED,
-          details: error
-        },
-        display: {
-          type: 'error',
-          content: `Failed to process: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        },
-      };
-    }
-  }
-}
-```
-
-### Step 3: Export from Category Index
-
-Add to `src/tools/implementations/[category]/index.ts`:
-
-```typescript
-export { MyTool } from './MyTool.js';
-```
-
-### Step 4: Register in App.tsx
-
-**IMPORTANT**: New tool categories must be registered in `src/components/core/App.tsx`:
-
-1. Import your category from tools index:
-```typescript
-import { toolRegistry, fetch as fetchTools, workflow as workflowTools, filesystem as filesystemTools } from '../../tools/index.js';
-```
-
-2. Register in the useEffect hook:
-```typescript
-await toolRegistry.autoRegister(filesystemTools);
-```
-
-Without this step, your tools won't be available to the assistant!
-
-### Step 5: Done!
-The tool is now registered and available when the app starts.
-
-## Tool Categories (ToolKind)
-
-Current categories:
-- `Fetch` - API calls, web requests, data fetching
-- `Other` - Default for uncategorized tools
-
-To add a new category:
-1. Add to `ToolKind` enum in `src/tools/core/types.ts`
-2. Create new directory in `implementations/`
-3. Update `src/tools/index.ts` to export the new category
-
-## Quick Examples
-
-### Simple API Tool
-```typescript
-export class GitHubUserTool extends Tool<{username: string}> {
-  readonly name = 'github_user';
-  readonly displayName = 'GitHub User';
-  readonly description = 'Get GitHub user information';
-  readonly kind = ToolKind.Fetch;
-
-  readonly inputSchema = {
-    type: 'object' as const,
-    properties: {
-      username: { type: 'string', description: 'GitHub username' },
-    },
-    required: ['username'],
-  };
-
-  protected async run(params: {username: string}): Promise<ToolResult> {
-    const response = await fetch(`https://api.github.com/users/${params.username}`);
-    const data = await response.json();
-
-    return {
-      success: true,
-      output: data,
-      display: {
-        type: 'markdown',
-        content: `**${data.name}** - ${data.bio}\nFollowers: ${data.followers}`,
-      },
-    };
-  }
-}
-```
-
-### Tool with Progress Updates
-```typescript
-protected async run(params: MyParams, context?: ToolContext): Promise<ToolResult> {
-  context?.onProgress?.('Starting process...');
-
-  // Long operation
-  await step1();
-  context?.onProgress?.('Step 1 complete...');
-
-  await step2();
-  context?.onProgress?.('Step 2 complete...');
-
-  return { success: true, output: result };
-}
-```
+The tools system follows **Gemini's clean architecture pattern**:
+- Tools return structured data, not UI components
+- UI components consume tool results via type discrimination
+- Clear separation: Core (business logic) vs UI (presentation)
 
 ## Directory Structure
+
 ```
 src/tools/
 ├── core/
-│   ├── Tool.ts           # Base class
-│   ├── ToolRegistry.ts   # Auto-registration
-│   └── types.ts          # All types, including ToolErrorType enum
+│   ├── Tool.ts              # Abstract base class
+│   ├── ToolExecutor.ts      # Executes tools by name
+│   ├── ToolRegistry.ts      # Tool registration system
+│   └── types.ts             # Core type definitions
 ├── implementations/
-│   ├── fetch/           # API calls, web requests
-│   │   └── index.ts
-│   ├── workflow/        # Task management, workflow tools
-│   │   ├── TaskWriteTool.ts
-│   │   └── index.ts
-│   └── filesystem/      # File operations
-│       ├── ReadTool.ts
-│       └── index.ts
-├── index.ts              # Main export (exports all categories)
-└── CLAUDE.md            # This file
+│   ├── filesystem/
+│   │   └── ReadTool.ts      # Example: file reading
+│   └── workflow/
+│       └── TaskWriteTool.ts # Example: task management
+└── ui/
+    ├── components/
+    │   └── TaskList.tsx     # Custom display components
+    ├── PillBadge.tsx        # Reusable pill badge
+    └── ToolMessage.tsx      # Main tool result renderer
 ```
+
+## Tool Result Interface (Gemini Pattern)
+
+**CRITICAL**: Tools must return this exact structure:
+
+```typescript
+export interface ToolResult {
+  llmContent: string;               // Required: What Claude sees in conversation
+  returnDisplay: ToolResultDisplay; // Required: What user sees in UI
+  error?: ToolError;                // Optional: If present, tool failed
+}
+```
+
+**Success is determined by absence of `error` field, NOT a boolean flag.**
+
+## Return Display Types
+
+Tools can return different display types via discriminated union:
+
+```typescript
+export type ToolResultDisplay =
+  | string              // Markdown or plain text
+  | FileDiff            // File edit diffs
+  | AnsiOutput          // Terminal output with ANSI codes
+  | TaskListDisplay;    // Custom task lists
+```
+
+### Type 1: String (Markdown/Text)
+
+**Use for:** File reads, simple outputs, formatted text
+
+```typescript
+return {
+  llmContent: `Successfully read file: ${filePath}`,
+  returnDisplay: `## File: ${filePath}\n\n\`\`\`\n${content}\n\`\`\``
+};
+```
+
+**UI Rendering:**
+- Automatically detects markdown patterns
+- Renders with `<Markdown>` component if patterns found
+- Falls back to plain `<Text>` otherwise
+
+### Type 2: FileDiff
+
+**Use for:** Edit/Write tools showing before/after changes
+
+```typescript
+export interface FileDiff {
+  fileDiff: string;           // Unified diff format
+  fileName: string;
+  originalContent: string | null;
+  newContent: string;
+  diffStat?: DiffStat;
+}
+
+return {
+  llmContent: `Updated ${fileName} with ${additions} additions`,
+  returnDisplay: {
+    fileDiff: unifiedDiffString,
+    fileName: 'path/to/file.ts',
+    originalContent: oldContent,
+    newContent: newContent,
+    diffStat: { additions: 5, deletions: 2, changes: 7 }
+  }
+};
+```
+
+**UI Rendering:**
+- Shows file name prominently
+- Displays diff with syntax highlighting
+- Shows stats if provided
+
+### Type 3: AnsiOutput
+
+**Use for:** Shell/terminal outputs with colors
+
+```typescript
+export interface AnsiOutput {
+  type: 'ansi';
+  content: string;  // Content with ANSI escape codes
+}
+
+return {
+  llmContent: `Command executed with exit code ${exitCode}`,
+  returnDisplay: {
+    type: 'ansi',
+    content: rawTerminalOutput  // Keeps ANSI color codes
+  }
+};
+```
+
+**UI Rendering:**
+- Preserves ANSI color codes
+- Renders in terminal-like display
+
+### Type 4: TaskListDisplay
+
+**Use for:** Task management, checklists, multi-step operations
+
+```typescript
+export interface TaskListDisplay {
+  type: 'task-list';
+  tasks: Array<{
+    content: string;
+    activeForm: string;
+    status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  }>;
+  stats?: {
+    total: number;
+    pending: number;
+    inProgress: number;
+    completed: number;
+    cancelled: number;
+  };
+}
+
+return {
+  llmContent: `Updated task list with ${stats.total} items`,
+  returnDisplay: {
+    type: 'task-list',
+    tasks: [
+      { content: 'Task 1', activeForm: 'Doing task 1', status: 'in_progress' },
+      { content: 'Task 2', activeForm: 'Doing task 2', status: 'pending' }
+    ],
+    stats: { total: 2, pending: 1, inProgress: 1, completed: 0, cancelled: 0 }
+  }
+};
+```
+
+**UI Rendering:**
+- Shows checkboxes with status indicators: `[ ]` `[◐]` `[✓]` `[x]`
+- Color-coded by status: pending=gray, in_progress=yellow, completed=green, cancelled=red
+- Displays in compact list format under pill badge
+
+## Error Handling
+
+**When tool fails, include error field:**
+
+```typescript
+return {
+  llmContent: `Error: File not found: ${filePath}`,
+  returnDisplay: `File not found: ${filePath}`,
+  error: {
+    message: `File does not exist: ${filePath}`,
+    type: ToolErrorType.FILE_NOT_FOUND,
+    details: error
+  }
+};
+```
+
+## Creating New Tools
+
+### Step 1: Create Tool Class
+
+```typescript
+// src/tools/implementations/category/YourTool.ts
+import { Tool } from '../../core/Tool.js';
+import type { ToolResult, ToolContext } from '../../core/types.js';
+
+interface YourToolParams {
+  param1: string;
+  param2?: number;
+}
+
+export class YourTool extends Tool<YourToolParams> {
+  name = 'your_tool';
+  displayName = 'Your Tool';
+  description = 'What your tool does';
+
+  getInputSchema() {
+    return {
+      type: 'object',
+      properties: {
+        param1: { type: 'string', description: 'Parameter description' },
+        param2: { type: 'number', description: 'Optional parameter' }
+      },
+      required: ['param1']
+    };
+  }
+
+  protected async run(params: YourToolParams, context?: ToolContext): Promise<ToolResult> {
+    // Your tool logic here
+
+    return {
+      llmContent: 'Summary for Claude',
+      returnDisplay: 'Display for user'
+    };
+  }
+
+  formatParams(params: Record<string, unknown>): string {
+    return params.param1 as string;
+  }
+
+  summarizeResult(result: ToolResult): string {
+    if (result.error) {
+      return `Error: ${result.error.message}`;
+    }
+    return 'Completed successfully';
+  }
+}
+```
+
+### Step 2: Export from Category Index
+
+```typescript
+// src/tools/implementations/category/index.ts
+export * from './YourTool.js';
+```
+
+### Step 3: Tool Auto-Registration
+
+Tools are automatically registered on startup via `ToolRegistry.ts`. No manual registration needed!
+
+## Creating Custom Display Components
+
+If you need a new display type (beyond string/FileDiff/AnsiOutput/TaskList):
+
+### Step 1: Define Type in types.ts
+
+```typescript
+// src/tools/core/types.ts
+export interface CustomDisplay {
+  type: 'custom';
+  // Your custom fields
+  data: SomeData;
+}
+
+export type ToolResultDisplay =
+  | string
+  | FileDiff
+  | AnsiOutput
+  | TaskListDisplay
+  | CustomDisplay;  // Add your type
+```
+
+### Step 2: Create Component
+
+```typescript
+// src/tools/ui/components/CustomDisplay.tsx
+import React from 'react';
+import { Box, Text } from 'ink';
+import type { CustomDisplay } from '../../core/types.js';
+
+interface CustomDisplayProps {
+  display: CustomDisplay;
+}
+
+export const CustomDisplay: React.FC<CustomDisplayProps> = ({ display }) => {
+  return (
+    <Box>
+      <Text>Your custom rendering here</Text>
+    </Box>
+  );
+};
+```
+
+### Step 3: Add to ToolMessage Renderer
+
+```typescript
+// src/tools/ui/ToolMessage.tsx
+import { CustomDisplay } from './components/CustomDisplay.js';
+
+// In ToolResultRenderer component:
+if (typeof resultDisplay === 'object' && 'type' in resultDisplay && resultDisplay.type === 'custom') {
+  return <CustomDisplay display={resultDisplay as CustomDisplay} />;
+}
+```
+
+## UI Display Patterns
+
+### Pill Badge (Tool Header)
+
+All tools display with a colored pill badge:
+- **Green** = Success (completed)
+- **Red** = Error (failed)
+- **Gray/Yellow** = In progress (executing)
+
+Format: `ToolName(params)`
+
+### Branch Indicator
+
+Description/output shown below pill with `└>` indicator:
+```
+ToolName(param)
+└> Description here
+   Output line 1
+   Output line 2
+```
+
+### Special Cases
+
+**Tasks**: Show only pill + task list (no `└>` branch)
+```
+Tasks(7 tasks)
+ [ ] Task 1
+ [◐] Task 2
+ [✓] Task 3
+```
+
+**Images**: Hidden from tool display (handled specially in message list)
 
 ## Best Practices
 
-1. **Keep tools focused** - One tool, one job
-2. **Use clear names** - Tool name should describe what it does
-3. **Provide good descriptions** - Help the assistant understand when to use the tool
-4. **Handle errors gracefully** - Always return proper error messages
-5. **Use appropriate display types** - markdown for rich content, text for simple, error for failures
-6. **Implement formatParams** - Makes tool calls more readable in the UI
-7. **Add progress updates** - For long-running operations
+1. **Always provide both `llmContent` and `returnDisplay`**
+   - `llmContent`: Concise summary for Claude's context
+   - `returnDisplay`: Rich formatted output for user
 
-## Common Pitfalls & Solutions
+2. **Choose appropriate display type**
+   - Simple output? Use string with markdown
+   - File changes? Use FileDiff
+   - Terminal commands? Use AnsiOutput
+   - Multi-step tasks? Use TaskListDisplay
 
-1. **Tool not found**: Make sure you registered the category in App.tsx
-2. **Missing error types**: Add new error types to `ToolErrorType` enum in types.ts
-3. **Validation issues**: Override `validate()` method for custom validation
-4. **Parameter naming**: Use snake_case for tool parameters (e.g., `file_path` not `filePath`)
-5. **Schema validation**: Always include `additionalProperties: false` and `$schema`
+3. **Keep components focused**
+   - One component per display type
+   - Place in `src/tools/ui/components/`
+   - Import in `ToolMessage.tsx`
 
-## Testing Your Tool
+4. **Follow Gemini patterns**
+   - Static service classes (not instances)
+   - Type discrimination for rendering
+   - No UI logic in tool classes
 
-1. Build: `npm run build`
-2. Run: `npm start`
-3. Ask Alfred to use your tool: "Can you [use your tool] for [params]?"
-4. Check the tool appears in registry: The app logs registered tools on startup
+5. **Error handling**
+   - Always catch errors in tool execution
+   - Provide helpful error messages
+   - Include error type for categorization
 
-## Need Help?
+## Testing Tools
 
-- All tools extend `Tool` base class from `core/Tool.ts`
-- See `ReadTool.ts` or `TaskWriteTool.ts` for complete, working examples
-- Tools are auto-discovered via `toolRegistry.autoRegister()` in App.tsx
-- No manual registration, no defensive code, no backwards compatibility needed
+```bash
+# Build after changes
+npm run build
+
+# Test in CLI
+npm start
+# Then trigger your tool in the conversation
+```
+
+## Common Patterns
+
+### File Operations
+```typescript
+return {
+  llmContent: `Read ${totalLines} lines from ${filePath}`,
+  returnDisplay: `## File: ${filePath}\n\n\`\`\`\n${content}\n\`\`\``
+};
+```
+
+### Status Updates
+```typescript
+return {
+  llmContent: `Updated ${count} items`,
+  returnDisplay: {
+    type: 'task-list',
+    tasks: updatedTasks,
+    stats: calculateStats(tasks)
+  }
+};
+```
+
+### Error Cases
+```typescript
+return {
+  llmContent: `Error: ${errorMessage}`,
+  returnDisplay: `Operation failed: ${errorMessage}`,
+  error: {
+    message: errorMessage,
+    type: ToolErrorType.EXECUTION_FAILED,
+    details: originalError
+  }
+};
+```
+
+## Key Files Reference
+
+- `src/tools/core/types.ts` - Type definitions (start here for types)
+- `src/tools/core/Tool.ts` - Base class (extend this)
+- `src/tools/ui/ToolMessage.tsx` - Main renderer (type discrimination)
+- `src/tools/ui/components/` - Display components (add new ones here)
+
+## Questions?
+
+1. Does your tool need a custom display? → Add to `ToolResultDisplay` union
+2. Is your display reusable? → Create in `ui/components/`
+3. Is it tool-specific logic? → Keep in tool class
+4. Is it presentation logic? → Move to UI component
+
+Remember: **Tools provide data, UI components render it.**
