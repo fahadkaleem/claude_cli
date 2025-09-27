@@ -11,6 +11,7 @@ import { useTheme } from '../hooks/useTheme.js';
 interface MessageListProps {
   messages: Message[];
   isLoading: boolean;
+  hasPendingPermission?: boolean;
 }
 
 // Helper to check and split interrupted messages
@@ -28,7 +29,8 @@ const parseInterruptedMessage = (content: string): { isInterrupted: boolean; mai
 
 export const MessageList: React.FC<MessageListProps> = ({
   messages,
-  isLoading
+  isLoading,
+  hasPendingPermission = false,
 }) => {
   const { settings } = useSettings();
   const { colors } = useTheme();
@@ -110,6 +112,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     // Add tool calls as separate items after the message
     if (message.toolCalls && message.toolCalls.length > 0) {
       message.toolCalls.forEach((toolCall, toolIndex) => {
+
         // Check if this is an image read that should be hidden
         const isImageRead = toolCall.name === 'read_file' &&
                            toolCall.result?.llmContent &&
@@ -131,7 +134,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     <Box flexDirection="column" marginBottom={1}>
       {messageElements}
 
-      {isLoading && (
+      {isLoading && !hasPendingPermission && (
         <Box>
           <ThinkingAnimation
             size={24}

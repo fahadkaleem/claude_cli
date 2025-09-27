@@ -42,6 +42,12 @@ export interface ToolResult {
    * If present, the tool call is considered a failure.
    */
   error?: ToolError;
+
+  /**
+   * If true, user rejected permission and agent loop should stop.
+   * Do NOT send this result back to Claude - just stop.
+   */
+  userRejected?: boolean;
 }
 
 /**
@@ -63,6 +69,15 @@ export interface FileDiff {
   originalContent: string | null;
   newContent: string;
   diffStat?: DiffStat;
+  rejected?: boolean;         // True if this is a rejection display
+  action?: 'create' | 'update';
+  hunks?: Array<{             // Structured hunks for rendering
+    oldStart: number;
+    oldLines: number;
+    newStart: number;
+    newLines: number;
+    lines: string[];
+  }>;
 }
 
 export interface DiffStat {
@@ -132,4 +147,10 @@ export interface ToolCall<TInput = unknown> {
   input: TInput;
   status: ToolStatus;
   result?: ToolResult;
+}
+
+export interface PermissionRequestData {
+  file_path?: string;
+  content?: string;
+  action: 'create' | 'update' | 'delete' | 'execute';
 }

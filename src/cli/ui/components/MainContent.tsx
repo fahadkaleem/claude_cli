@@ -8,18 +8,21 @@ interface MainContentProps {
   messages: Message[];
   isLoading: boolean;
   localMessage?: string | null;
+  hasPendingPermission?: boolean;
 }
 
 export const MainContent: React.FC<MainContentProps> = ({
   messages,
   isLoading,
-  localMessage
+  localMessage,
+  hasPendingPermission = false,
 }) => {
   return (
     <Box flexDirection="column" flexGrow={1}>
       <MessageList
         messages={messages}
         isLoading={isLoading}
+        hasPendingPermission={hasPendingPermission}
       />
 
       {/* Display local message if present (for non-abort messages) */}

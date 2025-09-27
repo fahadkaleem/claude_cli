@@ -5,6 +5,7 @@ import { Composer } from './components/Composer.js';
 import { Footer } from './components/Footer.js';
 import { AppHeader } from './components/AppHeader.js';
 import { ThemeSelector } from './components/ThemeSelector.js';
+import { PermissionDialog } from './components/PermissionDialog.js';
 import { useUIState } from './contexts/UIStateContext.js';
 import { useUIActions } from './contexts/UIActionsContext.js';
 
@@ -20,12 +21,19 @@ export const App: React.FC = () => {
         messages={state.messages}
         isLoading={state.isLoading}
         localMessage={state.localMessage}
+        hasPendingPermission={!!state.pendingPermission}
       />
 
       {state.currentDialog === 'theme-select' ? (
         <ThemeSelector
           onThemeSelect={actions.handleThemeSelect}
           onCancel={actions.closeDialog}
+        />
+      ) : state.pendingPermission ? (
+        <PermissionDialog
+          data={state.pendingPermission.data}
+          onApprove={actions.approvePermission}
+          onReject={actions.rejectPermission}
         />
       ) : (
         <>

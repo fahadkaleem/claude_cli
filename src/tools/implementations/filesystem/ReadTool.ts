@@ -1,5 +1,5 @@
 import { readFileSync, statSync } from 'fs';
-import { resolve, isAbsolute, extname } from 'path';
+import { resolve, isAbsolute, extname, relative } from 'path';
 import { Tool } from '../../core/Tool.js';
 import { ToolKind, ToolErrorType, type ToolResult, type ToolContext } from '../../core/types.js';
 
@@ -154,13 +154,17 @@ Input schema: {'type': 'object', 'properties': {'file_path': {'type': 'string', 
 
   formatParams(params: ReadToolParams): string {
     const { file_path, offset, limit } = params;
+    const cwd = process.cwd();
+    const fullPath = isAbsolute(file_path) ? file_path : resolve(cwd, file_path);
+    const relativePath = relative(cwd, fullPath);
+
     if (offset !== undefined || limit !== undefined) {
-      const parts = [file_path];
+      const parts = [relativePath];
       if (offset !== undefined) parts.push(`from line ${offset}`);
       if (limit !== undefined) parts.push(`${limit} lines`);
       return parts.join(', ');
     }
-    return file_path;
+    return relativePath;
   }
 
   summarizeResult(result: ToolResult): string {

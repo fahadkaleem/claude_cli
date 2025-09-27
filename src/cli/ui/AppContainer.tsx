@@ -10,6 +10,9 @@ import { UIActionsContext } from './contexts/UIActionsContext.js';
 import { DialogProvider, useDialog } from './contexts/DialogContext.js';
 import { SettingsProvider } from './contexts/SettingsContext.js';
 import { ShellModeProvider } from './contexts/shellModeContext.js';
+import { PermissionProvider, usePermission } from './contexts/PermissionContext.js';
+import { PermissionDialog } from './components/PermissionDialog.js';
+import { Box } from 'ink';
 
 interface AppContainerProps {
   model?: string;
@@ -21,6 +24,7 @@ const AppContainerContent: React.FC<AppContainerProps> = ({ model }) => {
   const { isConnected } = useToolRegistration();
   const { currentDialog, closeDialog } = useDialog();
   const { currentTheme, setCurrentTheme, handleThemeSelect } = useThemeCommand(closeDialog);
+  const { pendingPermission, approvePermission, rejectPermission } = usePermission();
 
   const {
     messages,
@@ -63,8 +67,9 @@ const AppContainerContent: React.FC<AppContainerProps> = ({ model }) => {
       currentDialog,
       model: model || 'claude-sonnet-4-20250514',
       currentTheme,
+      pendingPermission,
     }),
-    [messages, isLoading, error, isConnected, queuedMessages, localMessage, currentDialog, model, currentTheme]
+    [messages, isLoading, error, isConnected, queuedMessages, localMessage, currentDialog, model, currentTheme, pendingPermission]
   );
 
   const uiActions = useMemo(
@@ -76,8 +81,10 @@ const AppContainerContent: React.FC<AppContainerProps> = ({ model }) => {
       onAbortOperation: abortOperation,
       addMessageToHistory,
       closeDialog,
+      approvePermission,
+      rejectPermission,
     }),
-    [handleThemeSelect, handleSubmit, handleClearChat, abortOperation, addMessageToHistory, closeDialog]
+    [handleThemeSelect, handleSubmit, handleClearChat, abortOperation, addMessageToHistory, closeDialog, approvePermission, rejectPermission]
   );
 
   return (
@@ -98,7 +105,9 @@ const AppContainerContent: React.FC<AppContainerProps> = ({ model }) => {
 export const AppContainer: React.FC<AppContainerProps> = (props) => {
   return (
     <DialogProvider>
-      <AppContainerContent {...props} />
+      <PermissionProvider>
+        <AppContainerContent {...props} />
+      </PermissionProvider>
     </DialogProvider>
   );
 };

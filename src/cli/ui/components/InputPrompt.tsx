@@ -67,8 +67,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat,
       // Add shell command and output to chat WITHOUT invoking Claude
       const finalOutput = (shellOutputBuffer || output).trim();
 
-      console.log('Shell command completed:', command);
-      console.log('Shell output:', finalOutput);
 
       // Add command as user message
       addMessageToHistory(`! ${command}`, 'user');
@@ -190,7 +188,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat,
   // Create command execution context
   const createCommandContext = () => ({
     addMessage: (role: 'user' | 'assistant' | 'system', content: string) => {
-      console.log(`[${role}] ${content}`);
     },
     clearChat: () => {
       if (onClearChat) {

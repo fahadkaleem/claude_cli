@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { Message } from '../types.js';
+import type { PermissionRequestData } from '../../../tools/core/types.js';
 
 export interface UIState {
   messages: Message[];
@@ -11,6 +12,7 @@ export interface UIState {
   currentDialog: 'help' | 'settings' | 'about' | 'model' | 'theme-select' | null;
   model: string;
   currentTheme: string;
+  pendingPermission: { toolId: string; data: PermissionRequestData } | null;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

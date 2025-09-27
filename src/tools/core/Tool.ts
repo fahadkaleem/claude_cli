@@ -1,4 +1,4 @@
-import { ToolErrorType, ToolKind, type ToolSchema, type ToolResult, type ToolContext } from './types.js';
+import { ToolErrorType, ToolKind, type ToolSchema, type ToolResult, type ToolContext, type PermissionRequestData, type ToolResultDisplay } from './types.js';
 
 export abstract class Tool<TParams extends Record<string, unknown> = Record<string, unknown>> {
   abstract readonly name: string;
@@ -14,6 +14,15 @@ export abstract class Tool<TParams extends Record<string, unknown> = Record<stri
       input_schema: this.inputSchema,
     };
   }
+
+  // Check if this tool execution needs permission
+  needsPermission?(params: TParams): boolean;
+
+  // Get permission request data for UI
+  getPermissionRequest?(params: TParams): PermissionRequestData;
+
+  // Get rejection display for UI (diff view, etc.)
+  getRejectionDisplay?(params: TParams): ToolResultDisplay;
 
   // Format parameters for display (e.g., "Dubai" instead of {city: "Dubai"})
   formatParams(params: TParams): string {

@@ -4,6 +4,7 @@ import { render } from 'ink';
 import meow from 'meow';
 import { AppContainer } from './cli/ui/AppContainer.js';
 import { promptService } from './services/PromptService.js';
+import { setOriginalCwd } from './tools/utils/permissions.js';
 
 const cli = meow(`
   Usage
@@ -59,6 +60,9 @@ if (cli.flags.version) {
   cli.showVersion();
   process.exit(0);
 }
+
+// Store the original working directory for permission checks
+setOriginalCwd(process.cwd());
 
 // Handle --init-prompt flag
 if (cli.flags.initPrompt) {

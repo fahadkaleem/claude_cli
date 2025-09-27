@@ -9,6 +9,8 @@ export interface UIActions {
   onAbortOperation: () => void;
   addMessageToHistory: (content: string, role?: 'user' | 'assistant') => void;
   closeDialog: () => void;
+  approvePermission: (permanent: boolean) => void;
+  rejectPermission: () => void;
 }
 
 export const UIActionsContext = createContext<UIActions | null>(null);

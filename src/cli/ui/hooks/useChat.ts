@@ -119,6 +119,7 @@ export const useChat = () => {
               const messages = chatService.getMessages();
               const lastMessage = messages[messages.length - 1];
 
+
               if (lastMessage?.toolCalls) {
                 const toolCall = lastMessage.toolCalls.find(
                   tc => tc.id === step.toolCall.id

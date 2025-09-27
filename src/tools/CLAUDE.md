@@ -81,6 +81,15 @@ export interface FileDiff {
   originalContent: string | null;
   newContent: string;
   diffStat?: DiffStat;
+  rejected?: boolean;         // True if user rejected this write
+  action?: 'create' | 'update'; // Type of file operation
+  hunks?: Array<{             // Structured hunks for UnifiedDiff rendering
+    oldStart: number;
+    oldLines: number;
+    newStart: number;
+    newLines: number;
+    lines: string[];
+  }>;
 }
 
 return {

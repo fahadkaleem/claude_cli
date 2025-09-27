@@ -1,12 +1,15 @@
 import React, { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import Markdown from '@inkkit/ink-markdown';
-import type { ToolCall, ToolResultDisplay, TaskListDisplay } from '../core/types.js';
+import type { ToolCall, ToolResultDisplay, TaskListDisplay, FileDiff } from '../core/types.js';
 import { toolRegistry } from '../core/ToolRegistry.js';
 import { useTheme } from '../../cli/ui/hooks/useTheme.js';
 import type { ToolStatus } from '../core/types.js';
 import { PillBadge } from './PillBadge.js';
 import { TaskList } from './components/TaskList.js';
+import { UnifiedDiff } from './components/UnifiedDiff.js';
+import { HighlightedCode } from './components/HighlightedCode.js';
+import { basename, relative } from 'path';
 
 const BRANCH_INDICATOR = '└>';
 const INDENT_SIZE = 3;
@@ -69,13 +72,32 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
     [tool, toolCall.input]
   );
 
+  // Check if this is a rejected permission result
+  const isRejected = toolCall.result?.returnDisplay &&
+    typeof toolCall.result.returnDisplay === 'object' &&
+    'rejected' in toolCall.result.returnDisplay &&
+    (toolCall.result.returnDisplay as any).rejected === true;
+
   const statusColor = useMemo(
-    () => getStatusColor(toolCall.status, colors),
-    [toolCall.status, colors]
+    () => {
+      // Rejected tools should be shown in grey/dimmed
+      if (isRejected) {
+        return colors.secondary;
+      }
+      return getStatusColor(toolCall.status, colors);
+    },
+    [toolCall.status, colors, isRejected]
   );
 
   const titleText = formatToolTitle(displayName, formattedParams);
   const resultDisplay = toolCall.result?.returnDisplay;
+
+  // Parse result display for normal tools (must be before early returns to satisfy React hooks rules)
+  const { description, outputLines } = useMemo(
+    () => parseResultDisplay(resultDisplay),
+    [resultDisplay]
+  );
+
 
   const isTaskList = resultDisplay &&
     typeof resultDisplay === 'object' &&
@@ -92,10 +114,20 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
     );
   }
 
-  const { description, outputLines } = useMemo(
-    () => parseResultDisplay(resultDisplay),
-    [resultDisplay]
-  );
+  // Check if it's a FileDiff (especially rejected writes)
+  const isFileDiff = resultDisplay &&
+    typeof resultDisplay === 'object' &&
+    'fileDiff' in resultDisplay;
+
+  if (isFileDiff) {
+    const fileDiff = resultDisplay as FileDiff;
+    return (
+      <Box flexDirection="column">
+        <PillBadge statusColor={statusColor} titleText={titleText} />
+        <FileRejectionDisplay fileDiff={fileDiff} colors={colors} />
+      </Box>
+    );
+  }
 
   const displayLines = outputLines.slice(0, maxOutputLines);
   const hasMore = outputLines.length > maxOutputLines;
@@ -148,4 +180,54 @@ const OutputSection: React.FC<{
     )}
   </Box>
 );
+
+const FileRejectionDisplay: React.FC<{
+  fileDiff: FileDiff;
+  colors: ReturnType<typeof useTheme>['colors'];
+}> = ({ fileDiff, colors }) => {
+  const cwd = process.cwd();
+  const displayPath = relative(cwd, fileDiff.fileName);
+  const terminalWidth = process.stdout.columns || 80;
+
+  if (fileDiff.rejected) {
+    const action = fileDiff.action || 'update';
+
+    return (
+      <Box flexDirection="column">
+        <Text>
+          {'  '}{BRANCH_INDICATOR}{' '}
+          <Text color={colors.error}>
+            User rejected {action === 'update' ? 'update' : 'write'} to{' '}
+          </Text>
+          <Text bold>
+            {displayPath}
+          </Text>
+        </Text>
+        {fileDiff.hunks && fileDiff.hunks.length > 0 ? (
+          <Box flexDirection="column">
+            {fileDiff.hunks.map((hunk, index) => (
+              <Box key={index} paddingLeft={5} marginBottom={index < fileDiff.hunks!.length - 1 ? 1 : 0}>
+                <UnifiedDiff patch={hunk} width={terminalWidth - 12} dim={true} />
+              </Box>
+            ))}
+          </Box>
+        ) : (
+          <Box flexDirection="column" paddingLeft={5}>
+            <Text color={colors.secondary}>No changes to display</Text>
+          </Box>
+        )}
+      </Box>
+    );
+  }
+
+  // Non-rejected FileDiff (successful write)
+  return (
+    <Box flexDirection="column">
+      <Text>
+        {'  '}{BRANCH_INDICATOR}{' '}
+        <Text color={colors.success}>Updated {displayPath}</Text>
+      </Text>
+    </Box>
+  );
+};
 

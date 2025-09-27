@@ -4,8 +4,10 @@ import { Message } from '../cli/ui/types';
 import { getConfig } from './config.js';
 import { toolRegistry } from '../tools/core/ToolRegistry.js';
 import { toolExecutor } from '../tools/core/ToolExecutor.js';
-import { ToolCall, ToolStatus } from '../tools/core/types.js';
+import { ToolCall, ToolStatus, type PermissionRequestData } from '../tools/core/types.js';
 import { promptService } from './PromptService.js';
+import { permissionManager } from './PermissionManager.js';
+import { grantWritePermissionForOriginalDir } from '../tools/utils/permissions.js';
 
 // Clean type definitions with proper discriminated unions
 export interface AssistantStep {
@@ -24,6 +26,12 @@ export interface ToolCompleteStep {
   toolCall: ToolCall;
 }
 
+export interface ToolPermissionStep {
+  type: 'tool-permission';
+  toolCall: ToolCall;
+  permissionData: import('../tools/core/types.js').PermissionRequestData;
+}
+
 export interface ThinkingStep {
   type: 'thinking';
 }
@@ -36,6 +44,7 @@ export type AgentStep =
   | AssistantStep
   | ToolExecutingStep
   | ToolCompleteStep
+  | ToolPermissionStep
   | ThinkingStep
   | CompleteStep;
 
@@ -54,6 +63,34 @@ export class ChatService {
 
   constructor() {
     this.initializeClient();
+    this.setupPermissionHandler();
+  }
+
+  private abortController: AbortController | null = null;
+
+  private setupPermissionHandler(): void {
+    toolExecutor.onPermissionRequired = async (toolId: string, data: PermissionRequestData) => {
+      const response = await permissionManager.requestPermission(toolId, data);
+
+      // If rejected, abort the conversation - don't send rejection to Claude
+      // User rejected for a reason, no need to continue the loop
+      if (!response.approved) {
+        // Abort the current operation so Claude doesn't get a response
+        if (this.abortController) {
+          this.abortController.abort();
+        }
+        return false;
+      }
+
+      // Only grant persistent permission if user chose "don't ask again"
+      if (response.permanent) {
+        // Grant permission to the original project directory for the session
+        grantWritePermissionForOriginalDir();
+      }
+
+      // Return approval - for temporary, we just bypass the check this one time
+      return true;
+    };
   }
 
   private initializeClient(): void {
@@ -182,6 +219,10 @@ export class ChatService {
       throw new Error('Client not initialized');
     }
 
+    // Create abort controller for this message flow
+    this.abortController = new AbortController();
+    const combinedSignal = signal || this.abortController.signal;
+
     const config = getConfig();
 
     // Check if user message was already added
@@ -269,10 +310,19 @@ export class ChatService {
 
         // Process each tool
         for await (const step of this.processToolCalls(currentToolBlocks)) {
+          // Always yield the step first (even if aborted) so UI can show rejection
           yield step;
 
           if (step.type === 'tool-complete') {
             executedToolCalls.push(step.toolCall);
+          }
+
+          // Check if operation was aborted AFTER yielding (e.g., user rejected permission)
+          const isAborted = this.abortController?.signal.aborted || combinedSignal?.aborted;
+
+          if (isAborted) {
+            yield { type: 'complete' };
+            return;
           }
         }
 
