@@ -2,6 +2,7 @@
 export * as fetch from './implementations/fetch/index.js';
 export * as workflow from './implementations/workflow/index.js';
 export * as filesystem from './implementations/filesystem/index.js';
+export * as system from './implementations/system/index.js';
 
 // Export core functionality
 export { toolRegistry } from './core/ToolRegistry.js';

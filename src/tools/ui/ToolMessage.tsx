@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import Markdown from '@inkkit/ink-markdown';
-import type { ToolCall, ToolResultDisplay, TaskListDisplay, FileDiff } from '../core/types.js';
+import type { ToolCall, ToolResultDisplay, TaskListDisplay, FileDiff, AnsiOutput } from '../core/types.js';
 import { toolRegistry } from '../core/ToolRegistry.js';
 import { useTheme } from '../../cli/ui/hooks/useTheme.js';
 import type { ToolStatus } from '../core/types.js';
@@ -13,16 +13,17 @@ import { basename, relative } from 'path';
 
 const BRANCH_INDICATOR = '└>';
 const INDENT_SIZE = 3;
-const DEFAULT_MAX_LINES = 10;
+const BRANCH_INDENT = BRANCH_INDICATOR.length + 1; // Length of "└> "
+
+// Line limits per display type
+const LINE_LIMITS = {
+  ANSI: 3,
+  STRING: 10,
+  DEFAULT: 10,
+} as const;
 
 interface ToolMessageProps {
   toolCall: ToolCall;
-  maxOutputLines?: number;
-}
-
-interface ParsedResult {
-  description?: string;
-  outputLines: string[];
 }
 
 function getStatusColor(status: ToolStatus, colors: ReturnType<typeof useTheme>['colors']): string {
@@ -39,30 +40,30 @@ function getStatusColor(status: ToolStatus, colors: ReturnType<typeof useTheme>[
   }
 }
 
-function parseResultDisplay(resultDisplay: ToolResultDisplay | undefined): ParsedResult {
-  if (typeof resultDisplay !== 'string') {
-    return { outputLines: [] };
-  }
-
-  const lines = resultDisplay.trim().split('\n');
-  if (lines.length === 0) {
-    return { outputLines: [] };
-  }
-
-  return {
-    description: lines[0],
-    outputLines: lines.slice(1).filter(line => line.length > 0),
-  };
-}
-
 function formatToolTitle(displayName: string, formattedParams: string): string {
   return `${displayName}(${formattedParams})`;
 }
 
-export const ToolMessage: React.FC<ToolMessageProps> = ({
-  toolCall,
-  maxOutputLines = DEFAULT_MAX_LINES,
-}) => {
+function isDisplayType<T extends { type: string }>(
+  display: unknown,
+  type: string
+): display is T {
+  return (
+    typeof display === 'object' &&
+    display !== null &&
+    'type' in display &&
+    (display as any).type === type
+  );
+}
+
+function hasProperty<K extends string>(
+  obj: unknown,
+  prop: K
+): obj is Record<K, unknown> {
+  return typeof obj === 'object' && obj !== null && prop in obj;
+}
+
+export const ToolMessage: React.FC<ToolMessageProps> = ({ toolCall }) => {
   const { colors } = useTheme();
 
   const tool = useMemo(() => toolRegistry.get(toolCall.name), [toolCall.name]);
@@ -72,119 +73,144 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
     [tool, toolCall.input]
   );
 
-  // Check if this is a rejected permission result
-  const isRejected = toolCall.result?.returnDisplay &&
-    typeof toolCall.result.returnDisplay === 'object' &&
-    'rejected' in toolCall.result.returnDisplay &&
-    (toolCall.result.returnDisplay as any).rejected === true;
+  // Check rejection states
+  const isRejected = hasProperty(toolCall.result?.returnDisplay, 'rejected') &&
+    (toolCall.result!.returnDisplay as any).rejected === true;
+  const isUserRejected = toolCall.result?.userRejected === true;
 
   const statusColor = useMemo(
     () => {
-      // Rejected tools should be shown in grey/dimmed
-      if (isRejected) {
+      if (isUserRejected || isRejected) {
         return colors.secondary;
       }
       return getStatusColor(toolCall.status, colors);
     },
-    [toolCall.status, colors, isRejected]
+    [toolCall.status, colors, isRejected, isUserRejected]
   );
 
   const titleText = formatToolTitle(displayName, formattedParams);
   const resultDisplay = toolCall.result?.returnDisplay;
 
-  // Parse result display for normal tools (must be before early returns to satisfy React hooks rules)
-  const { description, outputLines } = useMemo(
-    () => parseResultDisplay(resultDisplay),
-    [resultDisplay]
+  // Route to appropriate renderer based on display type
+  if (isDisplayType<TaskListDisplay>(resultDisplay, 'task-list')) {
+    return <TaskListRenderer statusColor={statusColor} titleText={titleText} taskList={resultDisplay} />;
+  }
+
+  if (isDisplayType<AnsiOutput>(resultDisplay, 'ansi')) {
+    return (
+      <AnsiOutputRenderer
+        statusColor={statusColor}
+        titleText={titleText}
+        ansiOutput={resultDisplay}
+        colors={colors}
+      />
+    );
+  }
+
+  if (hasProperty(resultDisplay, 'fileDiff')) {
+    return (
+      <FileDiffRenderer
+        statusColor={statusColor}
+        titleText={titleText}
+        fileDiff={resultDisplay as FileDiff}
+        colors={colors}
+      />
+    );
+  }
+
+  if (typeof resultDisplay === 'string') {
+    return (
+      <StringOutputRenderer
+        statusColor={statusColor}
+        titleText={titleText}
+        content={resultDisplay}
+        colors={colors}
+      />
+    );
+  }
+
+  // Empty result
+  return (
+    <Box flexDirection="column">
+      <PillBadge statusColor={statusColor} titleText={titleText} />
+    </Box>
   );
+};
 
+// Specialized renderers for each display type
 
-  const isTaskList = resultDisplay &&
-    typeof resultDisplay === 'object' &&
-    'type' in resultDisplay &&
-    resultDisplay.type === 'task-list';
+const TaskListRenderer: React.FC<{
+  statusColor: string;
+  titleText: string;
+  taskList: TaskListDisplay;
+}> = ({ statusColor, titleText, taskList }) => (
+  <Box flexDirection="column">
+    <PillBadge statusColor={statusColor} titleText={titleText} />
+    <TaskList tasks={taskList.tasks} />
+  </Box>
+);
 
-  if (isTaskList) {
-    const taskList = resultDisplay as TaskListDisplay;
-    return (
-      <Box flexDirection="column">
-        <PillBadge statusColor={statusColor} titleText={titleText} />
-        <TaskList tasks={taskList.tasks} />
-      </Box>
-    );
-  }
-
-  // Check if it's a FileDiff (especially rejected writes)
-  const isFileDiff = resultDisplay &&
-    typeof resultDisplay === 'object' &&
-    'fileDiff' in resultDisplay;
-
-  if (isFileDiff) {
-    const fileDiff = resultDisplay as FileDiff;
-    return (
-      <Box flexDirection="column">
-        <PillBadge statusColor={statusColor} titleText={titleText} />
-        <FileRejectionDisplay fileDiff={fileDiff} colors={colors} />
-      </Box>
-    );
-  }
-
-  const displayLines = outputLines.slice(0, maxOutputLines);
-  const hasMore = outputLines.length > maxOutputLines;
-  const hiddenCount = outputLines.length - maxOutputLines;
+const AnsiOutputRenderer: React.FC<{
+  statusColor: string;
+  titleText: string;
+  ansiOutput: AnsiOutput;
+  colors: ReturnType<typeof useTheme>['colors'];
+}> = ({ statusColor, titleText, ansiOutput, colors }) => {
+  const outputLines = ansiOutput.content.split('\n').filter(line => line.trim().length > 0);
+  const maxLines = LINE_LIMITS.ANSI;
+  const displayLines = outputLines.slice(0, maxLines);
+  const hasMore = outputLines.length > maxLines;
+  const hiddenCount = outputLines.length - maxLines;
 
   return (
     <Box flexDirection="column">
       <PillBadge statusColor={statusColor} titleText={titleText} />
-
-      {description && (
-        <DescriptionLine statusColor={statusColor} description={description} />
-      )}
-
       {displayLines.length > 0 && (
-        <OutputSection
-          displayLines={displayLines}
+        <OutputWithBranch
+          lines={displayLines}
+          statusColor={statusColor}
           hasMore={hasMore}
           hiddenCount={hiddenCount}
-          warningColor={colors.warning}
         />
       )}
     </Box>
   );
 };
 
-const DescriptionLine: React.FC<{ statusColor: string; description: string }> = ({
-  statusColor,
-  description,
-}) => (
-  <Box marginLeft={INDENT_SIZE}>
-    <Text color={statusColor}>{BRANCH_INDICATOR} </Text>
-    <Markdown>{description}</Markdown>
-  </Box>
-);
+const StringOutputRenderer: React.FC<{
+  statusColor: string;
+  titleText: string;
+  content: string;
+  colors: ReturnType<typeof useTheme>['colors'];
+}> = ({ statusColor, titleText, content, colors }) => {
+  const lines = content.trim().split('\n').filter(line => line.length > 0);
 
-const OutputSection: React.FC<{
-  displayLines: string[];
-  hasMore: boolean;
-  hiddenCount: number;
-  warningColor: string;
-}> = ({ displayLines, hasMore, hiddenCount, warningColor }) => (
-  <Box flexDirection="column" marginLeft={INDENT_SIZE}>
-    {displayLines.map((line, idx) => (
-      <Text key={`output-${idx}`}>{line}</Text>
-    ))}
-    {hasMore && (
-      <Text color={warningColor}>
-        ... +{hiddenCount} more line{hiddenCount !== 1 ? 's' : ''}
-      </Text>
-    )}
-  </Box>
-);
+  const maxLines = LINE_LIMITS.STRING;
+  const displayLines = lines.slice(0, maxLines);
+  const hasMore = lines.length > maxLines;
+  const hiddenCount = lines.length - maxLines;
 
-const FileRejectionDisplay: React.FC<{
+  return (
+    <Box flexDirection="column">
+      <PillBadge statusColor={statusColor} titleText={titleText} />
+      {displayLines.length > 0 && (
+        <OutputWithBranch
+          lines={displayLines}
+          statusColor={statusColor}
+          hasMore={hasMore}
+          hiddenCount={hiddenCount}
+        />
+      )}
+    </Box>
+  );
+};
+
+const FileDiffRenderer: React.FC<{
+  statusColor: string;
+  titleText: string;
   fileDiff: FileDiff;
   colors: ReturnType<typeof useTheme>['colors'];
-}> = ({ fileDiff, colors }) => {
+}> = ({ statusColor, titleText, fileDiff, colors }) => {
   const cwd = process.cwd();
   const displayPath = relative(cwd, fileDiff.fileName);
   const terminalWidth = process.stdout.columns || 80;
@@ -194,14 +220,13 @@ const FileRejectionDisplay: React.FC<{
 
     return (
       <Box flexDirection="column">
+        <PillBadge statusColor={statusColor} titleText={titleText} />
         <Text>
           {'  '}{BRANCH_INDICATOR}{' '}
           <Text color={colors.error}>
             User rejected {action === 'update' ? 'update' : 'write'} to{' '}
           </Text>
-          <Text bold>
-            {displayPath}
-          </Text>
+          <Text bold>{displayPath}</Text>
         </Text>
         {fileDiff.hunks && fileDiff.hunks.length > 0 ? (
           <Box flexDirection="column">
@@ -223,6 +248,7 @@ const FileRejectionDisplay: React.FC<{
   // Non-rejected FileDiff (successful write)
   return (
     <Box flexDirection="column">
+      <PillBadge statusColor={statusColor} titleText={titleText} />
       <Text>
         {'  '}{BRANCH_INDICATOR}{' '}
         <Text color={colors.success}>Updated {displayPath}</Text>
@@ -231,3 +257,32 @@ const FileRejectionDisplay: React.FC<{
   );
 };
 
+// Shared component for rendering output with branch indicator
+const OutputWithBranch: React.FC<{
+  lines: string[];
+  statusColor: string;
+  hasMore: boolean;
+  hiddenCount: number;
+}> = ({ lines, statusColor, hasMore, hiddenCount }) => (
+  <Box flexDirection="column" marginLeft={INDENT_SIZE}>
+    {lines.map((line, idx) => (
+      <Box key={`output-${idx}`}>
+        {idx === 0 ? (
+          <>
+            <Text color={statusColor}>{BRANCH_INDICATOR} </Text>
+            <Text>{line}</Text>
+          </>
+        ) : (
+          <Box marginLeft={BRANCH_INDENT}>
+            <Text>{line}</Text>
+          </Box>
+        )}
+      </Box>
+    ))}
+    {hasMore && (
+      <Box marginLeft={BRANCH_INDENT}>
+        <Text dimColor>… +{hiddenCount} lines</Text>
+      </Box>
+    )}
+  </Box>
+);

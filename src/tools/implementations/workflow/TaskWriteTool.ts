@@ -26,7 +26,7 @@ interface TaskWriteParams extends Record<string, unknown> {
  * Helps track progress on complex multi-step tasks with visual indicators.
  */
 export class TaskWriteTool extends Tool<TaskWriteParams> {
-  readonly name = 'write_tasks';
+  readonly name = 'TasksWrite';
   readonly displayName = 'Tasks';
   readonly description = `Use this tool to create and manage a structured task list for your current work session. This helps you track progress, organize complex tasks, and demonstrate thoroughness to the user.
 It also helps the user understand the progress of the task and overall progress of their requests.

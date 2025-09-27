@@ -22,7 +22,7 @@ const TRUNCATED_MESSAGE =
   '<response clipped><NOTE>To save on context only part of this file has been shown to you.</NOTE>';
 
 export class WriteTool extends Tool<WriteToolParams> {
-  readonly name = 'write';
+  readonly name = 'Write';
   readonly displayName = 'Write';
   readonly description = `Writes a file to the local filesystem.
 

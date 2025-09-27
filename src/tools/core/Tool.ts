@@ -1,4 +1,6 @@
 import { ToolErrorType, ToolKind, type ToolSchema, type ToolResult, type ToolContext, type PermissionRequestData, type ToolResultDisplay } from './types.js';
+import type { ToolCallConfirmationDetails } from '../../core/permissions/types.js';
+import type { MessageBus } from '../../core/permissions/MessageBus.js';
 
 export abstract class Tool<TParams extends Record<string, unknown> = Record<string, unknown>> {
   abstract readonly name: string;
@@ -6,6 +8,12 @@ export abstract class Tool<TParams extends Record<string, unknown> = Record<stri
   abstract readonly description: string;
   abstract readonly kind: ToolKind;
   abstract readonly inputSchema: ToolSchema['input_schema'];
+
+  protected messageBus?: MessageBus;
+
+  constructor() {
+    // Empty constructor for subclasses
+  }
 
   get schema(): ToolSchema {
     return {
@@ -23,6 +31,16 @@ export abstract class Tool<TParams extends Record<string, unknown> = Record<stri
 
   // Get rejection display for UI (diff view, etc.)
   getRejectionDisplay?(params: TParams): ToolResultDisplay;
+
+  // Check if tool should prompt for confirmation before execution
+  async shouldConfirmExecute(
+    params: TParams,
+    abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    // Default: no confirmation needed
+    // Subclasses override this to implement permission checks
+    return false;
+  }
 
   // Format parameters for display (e.g., "Dubai" instead of {city: "Dubai"})
   formatParams(params: TParams): string {

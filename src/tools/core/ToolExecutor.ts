@@ -1,9 +1,11 @@
 import { toolRegistry } from './ToolRegistry.js';
 import { ToolErrorType, type ToolResult, type ToolContext, type ToolCall, type ToolStatus, type PermissionRequestData } from './types.js';
 import { revokeWritePermission } from '../utils/permissions.js';
+import { ToolCallConfirmationDetails, ToolConfirmationOutcome } from '../../core/permissions/types.js';
 
 export class ToolExecutor {
   onPermissionRequired?: (toolId: string, data: PermissionRequestData) => Promise<boolean>;
+  onConfirmationRequired?: (details: ToolCallConfirmationDetails) => Promise<ToolConfirmationOutcome>;
 
   private formatRejectionMessage(toolName: string, data: PermissionRequestData): string {
     if (data.file_path) {
@@ -31,6 +33,37 @@ export class ToolExecutor {
       };
     }
 
+    const abortSignal = context?.abortSignal || new AbortController().signal;
+
+    // NEW permission system: Check shouldConfirmExecute first
+    const confirmationDetails = await tool.shouldConfirmExecute(
+      params as Record<string, unknown>,
+      abortSignal
+    );
+
+    if (confirmationDetails) {
+      // Tool requires confirmation
+      if (!this.onConfirmationRequired) {
+        console.warn('Tool requires confirmation but onConfirmationRequired handler not set');
+        // Fall through to old system if new handler not available
+      } else {
+        const outcome = await this.onConfirmationRequired(confirmationDetails);
+
+        if (outcome === ToolConfirmationOutcome.Cancel) {
+          return {
+            llmContent: `User cancelled ${toolName} execution`,
+            returnDisplay: `Operation cancelled by user`,
+            userRejected: true,
+          };
+        }
+
+        // User approved (once, always, or always_prefix)
+        // The onConfirm callback in confirmationDetails already saved permissions if needed
+        await confirmationDetails.onConfirm(outcome);
+      }
+    }
+
+    // OLD permission system (fallback for tools not using shouldConfirmExecute)
     if (tool.needsPermission && tool.needsPermission(params as Record<string, unknown>)) {
       if (!this.onPermissionRequired || !tool.getPermissionRequest) {
         return {
@@ -56,6 +89,7 @@ export class ToolExecutor {
         return {
           llmContent: rejectionMessage,
           returnDisplay: rejectionDisplay,
+          userRejected: true,
         };
       }
     }

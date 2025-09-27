@@ -69,6 +69,22 @@ export class ChatService {
   private abortController: AbortController | null = null;
 
   private setupPermissionHandler(): void {
+    // NEW permission system handler
+    toolExecutor.onConfirmationRequired = async (details) => {
+      const confirmationId = `confirmation_${Date.now()}`;
+      const outcome = await permissionManager.requestConfirmation(confirmationId, details);
+
+      // If rejected, abort the conversation - don't send rejection to Claude
+      if (outcome === 'cancel') {
+        if (this.abortController) {
+          this.abortController.abort();
+        }
+      }
+
+      return outcome;
+    };
+
+    // OLD permission system handler (fallback)
     toolExecutor.onPermissionRequired = async (toolId: string, data: PermissionRequestData) => {
       const response = await permissionManager.requestPermission(toolId, data);
 

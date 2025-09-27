@@ -110,7 +110,7 @@ async function readImage(filePath: string, ext: string): Promise<{
  * Handles large files by allowing pagination through offset/limit parameters.
  */
 export class ReadTool extends Tool<ReadToolParams> {
-  readonly name = 'read_file';
+  readonly name = 'Read';
   readonly displayName = 'Read';
   readonly description = `Reads a file from the local filesystem. You can access any file directly by using this tool.
 Assume this tool is able to read all files on the machine. If the User provides a path to a file assume that path is valid. It is okay to read a file that does not exist; an error will be returned.

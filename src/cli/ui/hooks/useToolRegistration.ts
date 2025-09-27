@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { toolRegistry, fetch as fetchTools, workflow as workflowTools, filesystem as filesystemTools } from '../../../tools/index.js';
+import { BashTool } from '../../../tools/implementations/system/BashTool.js';
+import { PermissionStorage } from '../../../core/policy/PermissionStorage.js';
 
 interface UseToolRegistrationReturn {
   isConnected: boolean;
@@ -19,6 +21,12 @@ export const useToolRegistration = (): UseToolRegistrationReturn => {
         await toolRegistry.autoRegister(fetchTools);
         await toolRegistry.autoRegister(workflowTools);
         await toolRegistry.autoRegister(filesystemTools);
+
+        // Register BashTool manually with PermissionStorage
+        const permissionStorage = new PermissionStorage(process.cwd());
+        const bashTool = new BashTool(undefined, permissionStorage);
+        toolRegistry.register(bashTool);
+
         setIsConnected(true);
         setError(null);
       } catch (err) {

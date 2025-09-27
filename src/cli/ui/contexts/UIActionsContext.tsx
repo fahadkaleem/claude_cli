@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { ThemePreset } from '../types.js';
+import type { ToolConfirmationOutcome } from '../../../core/permissions/types.js';
 
 export interface UIActions {
   handleThemeSelect: (theme: ThemePreset) => void;
@@ -11,6 +12,7 @@ export interface UIActions {
   closeDialog: () => void;
   approvePermission: (permanent: boolean) => void;
   rejectPermission: () => void;
+  respondToConfirmation: (outcome: ToolConfirmationOutcome) => void;
 }
 
 export const UIActionsContext = createContext<UIActions | null>(null);

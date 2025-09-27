@@ -24,7 +24,7 @@ const AppContainerContent: React.FC<AppContainerProps> = ({ model }) => {
   const { isConnected } = useToolRegistration();
   const { currentDialog, closeDialog } = useDialog();
   const { currentTheme, setCurrentTheme, handleThemeSelect } = useThemeCommand(closeDialog);
-  const { pendingPermission, approvePermission, rejectPermission } = usePermission();
+  const { pendingPermission, pendingConfirmation, approvePermission, rejectPermission, respondToConfirmation } = usePermission();
 
   const {
     messages,
@@ -68,8 +68,9 @@ const AppContainerContent: React.FC<AppContainerProps> = ({ model }) => {
       model: model || 'claude-sonnet-4-20250514',
       currentTheme,
       pendingPermission,
+      pendingConfirmation,
     }),
-    [messages, isLoading, error, isConnected, queuedMessages, localMessage, currentDialog, model, currentTheme, pendingPermission]
+    [messages, isLoading, error, isConnected, queuedMessages, localMessage, currentDialog, model, currentTheme, pendingPermission, pendingConfirmation]
   );
 
   const uiActions = useMemo(
@@ -83,8 +84,9 @@ const AppContainerContent: React.FC<AppContainerProps> = ({ model }) => {
       closeDialog,
       approvePermission,
       rejectPermission,
+      respondToConfirmation,
     }),
-    [handleThemeSelect, handleSubmit, handleClearChat, abortOperation, addMessageToHistory, closeDialog, approvePermission, rejectPermission]
+    [handleThemeSelect, handleSubmit, handleClearChat, abortOperation, addMessageToHistory, closeDialog, approvePermission, rejectPermission, respondToConfirmation]
   );
 
   return (

@@ -1,32 +1,48 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { permissionManager } from '../../../services/PermissionManager.js';
 import type { PermissionRequestData } from '../../../tools/core/types.js';
+import type { ToolCallConfirmationDetails, ToolConfirmationOutcome } from '../../../core/permissions/types.js';
 
 interface PendingPermission {
   toolId: string;
   data: PermissionRequestData;
 }
 
+interface PendingConfirmation {
+  confirmationId: string;
+  details: ToolCallConfirmationDetails;
+}
+
 interface PermissionContextType {
   pendingPermission: PendingPermission | null;
+  pendingConfirmation: PendingConfirmation | null;
   approvePermission: (permanent: boolean) => void;
   rejectPermission: () => void;
+  respondToConfirmation: (outcome: ToolConfirmationOutcome) => void;
 }
 
 const PermissionContext = createContext<PermissionContextType | undefined>(undefined);
 
 export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [pendingPermission, setPendingPermission] = useState<PendingPermission | null>(null);
+  const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
 
-  // Poll for pending permissions
   useEffect(() => {
-    const interval = setInterval(() => {
-      // Check if there's a new pending permission
-      // This is a simple approach - in a real app you'd use events
-      // For now we'll just check manually when permissions are requested
-    }, 100);
+    const handlePermissionRequested = (toolId: string, data: PermissionRequestData) => {
+      setPendingPermission({ toolId, data });
+    };
 
-    return () => clearInterval(interval);
+    const handleConfirmationRequested = (confirmationId: string, details: ToolCallConfirmationDetails) => {
+      setPendingConfirmation({ confirmationId, details });
+    };
+
+    permissionManager.on('permission-requested', handlePermissionRequested);
+    permissionManager.on('confirmation-requested', handleConfirmationRequested);
+
+    return () => {
+      permissionManager.off('permission-requested', handlePermissionRequested);
+      permissionManager.off('confirmation-requested', handleConfirmationRequested);
+    };
   }, []);
 
   const approvePermission = (permanent: boolean) => {
@@ -43,14 +59,21 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
-  // Expose a way to set pending permissions
-  // This will be called by the permission manager
-  (globalThis as any).__setUIPendingPermission = (toolId: string, data: PermissionRequestData) => {
-    setPendingPermission({ toolId, data });
+  const respondToConfirmation = (outcome: ToolConfirmationOutcome) => {
+    if (pendingConfirmation) {
+      permissionManager.respondToConfirmation(pendingConfirmation.confirmationId, outcome);
+      setPendingConfirmation(null);
+    }
   };
 
   return (
-    <PermissionContext.Provider value={{ pendingPermission, approvePermission, rejectPermission }}>
+    <PermissionContext.Provider value={{
+      pendingPermission,
+      pendingConfirmation,
+      approvePermission,
+      rejectPermission,
+      respondToConfirmation
+    }}>
       {children}
     </PermissionContext.Provider>
   );
