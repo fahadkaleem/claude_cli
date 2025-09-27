@@ -22,14 +22,12 @@ export abstract class Tool<TParams extends Record<string, unknown> = Record<stri
     return values.length === 1 ? String(values[0]) : JSON.stringify(params);
   }
 
-  // Summarize result in one line for display
   summarizeResult(result: ToolResult): string {
-    if (!result.success) {
-      return `Error: ${result.error || 'Failed'}`;
+    if (result.error) {
+      return `Error: ${result.error.message || 'Failed'}`;
     }
-    // Subclasses should override for better summaries
-    if (result.display?.type === 'markdown' || result.display?.type === 'text') {
-      const lines = result.display.content.split('\n');
+    if (typeof result.returnDisplay === 'string') {
+      const lines = result.returnDisplay.split('\n');
       return lines[0] || 'Completed';
     }
     return 'Completed';
@@ -58,15 +56,11 @@ export abstract class Tool<TParams extends Record<string, unknown> = Record<stri
     const validationError = this.validate(params);
     if (validationError) {
       return {
-        success: false,
-        output: null,
+        llmContent: validationError,
+        returnDisplay: validationError,
         error: {
           message: validationError,
           type: ToolErrorType.INVALID_PARAMS
-        },
-        display: {
-          type: 'error',
-          content: validationError,
         },
       };
     }
@@ -77,15 +71,11 @@ export abstract class Tool<TParams extends Record<string, unknown> = Record<stri
       return result;
     } catch (error) {
       return {
-        success: false,
-        output: null,
+        llmContent: error instanceof Error ? error.message : String(error),
+        returnDisplay: `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`,
         error: {
           message: error instanceof Error ? error.message : String(error),
           type: ToolErrorType.EXECUTION_FAILED
-        },
-        display: {
-          type: 'error',
-          content: `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`,
         },
       };
     }

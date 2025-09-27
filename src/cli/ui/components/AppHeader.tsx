@@ -22,34 +22,37 @@ export const AppHeader: React.FC = () => {
 
 	return (
 		<>
-			<Gradient colors={[colors.primary, colors.tool]}>
-				<BigText text="Alfred" font="tiny" />
-			</Gradient>
+			<Box justifyContent="center">
+				<Gradient colors={[colors.primary, colors.tool]}>
+					<BigText text="Alfred" font="tiny" />
+				</Gradient>
+			</Box>
 
 			<TitledBox
 				key={colors.primary}
 				borderStyle="round"
-				titles={[`✻ Welcome to Alfred ${packageJson.version}`]}
+				titles={[`cwd: ${process.cwd()}`]}
 				titleStyles={titleStyles.pill}
+				titleJustify="flex-start"
 				width={boxWidth}
-				borderColor={colors.primary}
+				borderColor={colors.info}
 				paddingX={2}
 				paddingY={1}
 				flexDirection="column"
 				marginBottom={1}
 			>
 				<Box paddingBottom={1}>
-					<Text color={colors.white}>Tips for getting started:</Text>
+					<Text color={colors.white}>Welcome to Alfred, your AI project planning buddy...</Text>
 				</Box>
 				<Box paddingBottom={1} flexDirection="column">
 					<Text color={colors.secondary}>
-						1. Use natural language to describe what you want to build.
+						1. Break down projects into tasks with natural language.
 					</Text>
 					<Text color={colors.secondary}>
-						2. Ask for file analysis, editing, bash commands and more.
+						2. Get help with file analysis, code reviews, and planning.
 					</Text>
 					<Text color={colors.secondary}>
-						3. Be specific as you would with another engineer for best results.
+						3. Track progress and manage your development workflow.
 					</Text>
 					<Text color={colors.secondary}>
 						4. Type /exit or press Ctrl+C to quit.

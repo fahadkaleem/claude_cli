@@ -111,7 +111,7 @@ async function readImage(filePath: string, ext: string): Promise<{
  */
 export class ReadTool extends Tool<ReadToolParams> {
   readonly name = 'read_file';
-  readonly displayName = 'Read File';
+  readonly displayName = 'Read';
   readonly description = `Reads a file from the local filesystem. You can access any file directly by using this tool.
 Assume this tool is able to read all files on the machine. If the User provides a path to a file assume that path is valid. It is okay to read a file that does not exist; an error will be returned.
 
@@ -164,11 +164,11 @@ Input schema: {'type': 'object', 'properties': {'file_path': {'type': 'string', 
   }
 
   summarizeResult(result: ToolResult): string {
-    if (!result.success) {
-      return `Failed: ${result.error?.message}`;
+    if (result.error) {
+      return `Failed: ${result.error.message}`;
     }
     // Extract line count from the content if available
-    const content = result.display?.content || '';
+    const content = typeof result.returnDisplay === 'string' ? result.returnDisplay : '';
     const lines = content.split('\n');
     if (lines.length > 1) {
       return `Read ${lines.length} lines`;
@@ -233,16 +233,8 @@ Input schema: {'type': 'object', 'properties': {'file_path': {'type': 'string', 
         const imageData = await readImage(absolutePath, ext);
 
         return {
-          success: true,
-          output: {
-            type: 'image',
-            base64: imageData.base64,
-            mediaType: imageData.mediaType,
-          },
-          display: {
-            type: 'markdown',
-            content: `## Image: ${file_path}\n\nRead image successfully`,
-          },
+          llmContent: `Successfully read image: ${file_path}. Image data processed and available for display.`,
+          returnDisplay: `## Image: ${file_path}\n\nRead image successfully`,
         };
       }
 
@@ -305,17 +297,8 @@ ${formattedContent}
       }
 
       return {
-        success: true,
-        output: {
-          content: formattedContent,
-          totalLines,
-          linesShown: [startLine + 1, endLine],
-          isTruncated,
-        },
-        display: {
-          type: 'markdown',
-          content: displayContent,
-        },
+        llmContent: `Successfully read file: ${file_path}. Total lines: ${totalLines}, showing lines ${startLine + 1}-${endLine}${isTruncated ? ' (truncated)' : ''}.`,
+        returnDisplay: displayContent,
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -323,64 +306,48 @@ ${formattedContent}
       // Handle common errors
       if (errorMessage.includes('ENOENT')) {
         return {
-          success: false,
-          output: null,
+          llmContent: `Error: File does not exist: ${file_path}`,
+          returnDisplay: `File does not exist: ${file_path}`,
           error: {
             message: `File does not exist: ${file_path}`,
             type: ToolErrorType.FILE_NOT_FOUND,
             details: error,
-          },
-          display: {
-            type: 'error',
-            content: `File does not exist: ${file_path}`,
           },
         };
       }
 
       if (errorMessage.includes('EISDIR')) {
         return {
-          success: false,
-          output: null,
+          llmContent: `Error: Cannot read directory. Use Bash tool with 'ls' command to list directory contents: ${file_path}`,
+          returnDisplay: `Cannot read directory. Use Bash tool with 'ls' command to list directory contents: ${file_path}`,
           error: {
             message: `Cannot read directory. Use Bash tool with 'ls' command to list directory contents: ${file_path}`,
             type: ToolErrorType.INVALID_PARAMS,
             details: error,
-          },
-          display: {
-            type: 'error',
-            content: `Cannot read directory. Use Bash tool with 'ls' command to list directory contents: ${file_path}`,
           },
         };
       }
 
       if (errorMessage.includes('EACCES')) {
         return {
-          success: false,
-          output: null,
+          llmContent: `Error: Permission denied: ${file_path}`,
+          returnDisplay: `Permission denied: ${file_path}`,
           error: {
             message: `Permission denied: ${file_path}`,
             type: ToolErrorType.PERMISSION_DENIED,
             details: error,
-          },
-          display: {
-            type: 'error',
-            content: `Permission denied: ${file_path}`,
           },
         };
       }
 
       // Generic error
       return {
-        success: false,
-        output: null,
+        llmContent: `Error: Failed to read file: ${errorMessage}`,
+        returnDisplay: `Failed to read file: ${errorMessage}`,
         error: {
           message: errorMessage,
           type: ToolErrorType.EXECUTION_FAILED,
           details: error,
-        },
-        display: {
-          type: 'error',
-          content: `Failed to read file: ${errorMessage}`,
         },
       };
     }

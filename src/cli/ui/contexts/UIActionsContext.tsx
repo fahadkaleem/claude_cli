@@ -7,6 +7,7 @@ export interface UIActions {
   onClearChat: () => void;
   onDisplayLocalMessage: (message: string | null) => void;
   onAbortOperation: () => void;
+  addMessageToHistory: (content: string, role?: 'user' | 'assistant') => void;
   closeDialog: () => void;
 }
 

@@ -9,6 +9,9 @@ import { useDialog } from '../contexts/DialogContext.js';
 import { useTheme } from '../hooks/useTheme.js';
 import { useTerminalWidth } from '../hooks/useTerminalWidth.js';
 import { useArrowKeyHistory } from '../hooks/useArrowKeyHistory.js';
+import { useShellMode } from '../contexts/shellModeContext.js';
+import { useShellHistory } from '../hooks/useShellHistory.js';
+import { useShellCommandProcessor } from '../hooks/useShellCommandProcessor.js';
 import { addToHistory } from '../../../config/alfredConfig.js';
 import { readFile } from 'fs/promises';
 import { resolve } from 'path';
@@ -29,13 +32,14 @@ interface InputPromptProps {
   onClearChat?: () => void;
   onDisplayLocalMessage?: (message: string) => void;
   onAbortOperation?: () => void;
+  addMessageToHistory: (content: string, role?: 'user' | 'assistant') => void;
   isLoading?: boolean;
 }
 
 // Initialize commands once
 registerBuiltInCommands();
 
-export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat, onDisplayLocalMessage, onAbortOperation, isLoading = false }) => {
+export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat, onDisplayLocalMessage, onAbortOperation, addMessageToHistory, isLoading = false }) => {
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState<SlashCommand[]>([]);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
@@ -48,6 +52,39 @@ export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat,
   const { openDialog } = useDialog();
   const { colors } = useTheme();
   const columns = useTerminalWidth();
+
+  // Shell mode
+  const { shellModeActive, setShellModeActive, shellConfig } = useShellMode();
+  const shellHistory = useShellHistory();
+  const [shellOutputBuffer, setShellOutputBuffer] = useState<string>('');
+
+  const { executeShellCommand } = useShellCommandProcessor({
+    onShellOutput: (output) => {
+      // Accumulate output as it streams
+      setShellOutputBuffer(prev => prev + output);
+    },
+    onShellComplete: (command, output, exitCode) => {
+      // Add shell command and output to chat WITHOUT invoking Claude
+      const finalOutput = (shellOutputBuffer || output).trim();
+
+      console.log('Shell command completed:', command);
+      console.log('Shell output:', finalOutput);
+
+      // Add command as user message
+      addMessageToHistory(`! ${command}`, 'user');
+
+      // Add output as assistant message with tree formatting
+      const formattedOutput = finalOutput.split('\n').map(line => `  ⎿  ${line}`).join('\n');
+      addMessageToHistory(formattedOutput, 'assistant');
+
+      setShellOutputBuffer(''); // Clear buffer
+    },
+    onShellError: (error) => {
+      addMessageToHistory(`Shell error: ${error}`, 'assistant');
+      setShellOutputBuffer(''); // Clear buffer
+    },
+    shellConfig,
+  });
 
   // Callback to restore pasted contents from history
   const handleRestorePastedContents = (pastedContents: Record<string, any>) => {
@@ -91,6 +128,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat,
 
   // Handle keyboard navigation for suggestions
   useInput((input, key) => {
+    // Handle escape to exit shell mode
+    if (key.escape && shellModeActive) {
+      setShellModeActive(false);
+      return;
+    }
 
     // Handle suggestions navigation
     if (suggestions.length > 0) {
@@ -228,6 +270,19 @@ export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat,
     // Don't submit empty messages
     if (!value.trim()) return;
 
+    // Handle shell mode
+    if (shellModeActive) {
+      shellHistory.addCommandToHistory(value);
+
+      // Execute shell command and wait for output
+      await executeShellCommand(value);
+
+      // Note: Output will be sent to chat via onShellComplete callback
+      setInputValue('');
+      setShellModeActive(false); // Exit shell mode after execution
+      return;
+    }
+
     // Keep the original value for display (with placeholders)
     const displayValue = value;
 
@@ -323,6 +378,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat,
   };
 
   const handleInputChange = async (value: string) => {
+    // Check if user is trying to toggle shell mode
+    if (value === '!' && inputValue === '') {
+      setShellModeActive(!shellModeActive);
+      return; // Don't set the '!' in input
+    }
     // Check if the pasted content is an image file path (from Finder drag & drop)
     const imageExtensions = /\.(png|jpg|jpeg|gif|bmp|webp)$/i;
 
@@ -405,9 +465,19 @@ export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat,
         </Box>
       )}
 
+      {/* Shell mode indicator above input */}
+      {shellModeActive && (
+        <Box flexDirection="row" justifyContent="flex-end">
+          <Text color={colors.shell}>shell mode enabled </Text>
+          <Text dimColor>(esc to disable)</Text>
+        </Box>
+      )}
+
       {/* Input box with rounded corners */}
-      <Box borderStyle="round" borderColor={colors.secondary} paddingX={1}>
-        <Text color={colors.secondary} bold>{'> '}</Text>
+      <Box borderStyle="round" borderColor={shellModeActive ? colors.shell : colors.secondary} paddingX={1}>
+        <Text color={shellModeActive ? colors.shell : colors.secondary} bold>
+          {shellModeActive ? '! ' : '> '}
+        </Text>
         <TextInput
           value={inputValue}
           onChange={handleInputChange}

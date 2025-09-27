@@ -285,8 +285,8 @@ When in doubt, use this tool. Being proactive with task management demonstrates 
   }
 
   summarizeResult(result: ToolResult): string {
-    if (!result.success) {
-      return `Failed: ${result.error?.message}`;
+    if (result.error) {
+      return `Failed: ${result.error.message}`;
     }
     const stats = this.getTaskStatistics();
     return `${stats.pending} pending, ${stats.inProgress} active, ${stats.completed} done`;
@@ -367,11 +367,11 @@ When in doubt, use this tool. Being proactive with task management demonstrates 
       : 'Successfully cleared the task list';
 
     return {
-      success: true,
-      output: { tasks, stats },
-      display: {
-        type: 'markdown',
-        content: taskDisplay,
+      llmContent,
+      returnDisplay: {
+        type: 'task-list',
+        tasks,
+        stats,
       },
     };
   }

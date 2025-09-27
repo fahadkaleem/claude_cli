@@ -5,7 +5,6 @@ import { Composer } from './components/Composer.js';
 import { Footer } from './components/Footer.js';
 import { AppHeader } from './components/AppHeader.js';
 import { ThemeSelector } from './components/ThemeSelector.js';
-import Status from './components/Status.js';
 import { useUIState } from './contexts/UIStateContext.js';
 import { useUIActions } from './contexts/UIActionsContext.js';
 
@@ -16,7 +15,6 @@ export const App: React.FC = () => {
   return (
     <Box flexDirection="column" paddingX={1} paddingY={1}>
       <AppHeader />
-      <Status provider="Claude" model={state.model} />
 
       <MainContent
         messages={state.messages}
@@ -40,6 +38,7 @@ export const App: React.FC = () => {
             onClearChat={actions.onClearChat}
             onDisplayLocalMessage={actions.onDisplayLocalMessage}
             onAbortOperation={actions.onAbortOperation}
+            addMessageToHistory={actions.addMessageToHistory}
           />
 
           <Footer

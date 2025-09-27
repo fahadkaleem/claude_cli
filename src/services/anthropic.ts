@@ -98,7 +98,7 @@ export class ChatService {
 
       // Update tool call with result
       toolCall.result = result;
-      toolCall.status = result.success ? ToolStatus.Completed : ToolStatus.Failed;
+      toolCall.status = result.error ? ToolStatus.Failed : ToolStatus.Completed;
 
       // Yield complete status
       yield { type: 'tool-complete', toolCall };
@@ -119,6 +119,16 @@ export class ChatService {
       timestamp: new Date()
     };
     this.messages.push(userMessage);
+  }
+
+  addAssistantMessage(content: string, displayContent?: string): void {
+    const assistantMessage: Message = {
+      role: 'assistant',
+      content,
+      displayContent,
+      timestamp: new Date()
+    };
+    this.messages.push(assistantMessage);
   }
 
   /**
@@ -268,32 +278,29 @@ export class ChatService {
 
         // Build tool results as user message content
         const toolResultContent = executedToolCalls.map(call => {
-          const output = call.result?.output;
-
-          // Handle image output
-          if (output && typeof output === 'object' && 'type' in output && output.type === 'image') {
-            const imageOutput = output as { type: 'image'; base64: string; mediaType: string };
+          const result = call.result;
+          if (!result) {
             return {
               type: 'tool_result' as const,
               tool_use_id: call.id,
-              content: [
-                {
-                  type: 'image' as const,
-                  source: {
-                    type: 'base64' as const,
-                    media_type: imageOutput.mediaType as any,
-                    data: imageOutput.base64,
-                  },
-                },
-              ],
+              content: 'No result',
             };
           }
 
-          // Handle regular text output
+          // If there's an error, include it in the result
+          if (result.error) {
+            return {
+              type: 'tool_result' as const,
+              tool_use_id: call.id,
+              content: `Error: ${result.error.message}`,
+            };
+          }
+
+          // Use llmContent for the API
           return {
             type: 'tool_result' as const,
             tool_use_id: call.id,
-            content: output ? JSON.stringify(output) : 'No output',
+            content: result.llmContent,
           };
         });
 

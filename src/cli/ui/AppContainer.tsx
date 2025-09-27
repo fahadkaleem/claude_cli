@@ -9,6 +9,7 @@ import { UIStateContext } from './contexts/UIStateContext.js';
 import { UIActionsContext } from './contexts/UIActionsContext.js';
 import { DialogProvider, useDialog } from './contexts/DialogContext.js';
 import { SettingsProvider } from './contexts/SettingsContext.js';
+import { ShellModeProvider } from './contexts/shellModeContext.js';
 
 interface AppContainerProps {
   model?: string;
@@ -27,6 +28,7 @@ const AppContainerContent: React.FC<AppContainerProps> = ({ model }) => {
     error,
     queuedMessages,
     sendMessage,
+    addMessageToHistory,
     clearChat,
     abortOperation
   } = useChat();
@@ -72,21 +74,24 @@ const AppContainerContent: React.FC<AppContainerProps> = ({ model }) => {
       onClearChat: handleClearChat,
       onDisplayLocalMessage: setLocalMessage,
       onAbortOperation: abortOperation,
+      addMessageToHistory,
       closeDialog,
     }),
-    [handleThemeSelect, handleSubmit, handleClearChat, abortOperation, closeDialog]
+    [handleThemeSelect, handleSubmit, handleClearChat, abortOperation, addMessageToHistory, closeDialog]
   );
 
   return (
-    <SettingsProvider>
-      <ThemeContext.Provider value={themeContextValue}>
-        <UIStateContext.Provider value={uiState}>
-          <UIActionsContext.Provider value={uiActions}>
-            <App />
-          </UIActionsContext.Provider>
-        </UIStateContext.Provider>
-      </ThemeContext.Provider>
-    </SettingsProvider>
+    <ShellModeProvider>
+      <SettingsProvider>
+        <ThemeContext.Provider value={themeContextValue}>
+          <UIStateContext.Provider value={uiState}>
+            <UIActionsContext.Provider value={uiActions}>
+              <App />
+            </UIActionsContext.Provider>
+          </UIStateContext.Provider>
+        </ThemeContext.Provider>
+      </SettingsProvider>
+    </ShellModeProvider>
   );
 };
 

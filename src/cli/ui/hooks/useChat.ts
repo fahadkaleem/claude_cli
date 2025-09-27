@@ -19,6 +19,20 @@ export const useChat = () => {
   const isProcessing = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Add message to history without invoking Claude
+  const addMessageToHistory = useCallback((content: string, role: 'user' | 'assistant' = 'user') => {
+    if (role === 'user') {
+      chatService.addUserMessage(content, content);
+    } else {
+      chatService.addAssistantMessage(content, content);
+    }
+    // Force state update with a new array reference
+    setState(prev => ({
+      ...prev,
+      messages: [...chatService.getMessages()]
+    }));
+  }, []);
+
   // Process a single message
   const processMessage = useCallback(async (
     content: string,
@@ -243,6 +257,7 @@ export const useChat = () => {
     error: state.error,
     queuedMessages,
     sendMessage,
+    addMessageToHistory,
     clearError,
     clearChat,
     abortOperation

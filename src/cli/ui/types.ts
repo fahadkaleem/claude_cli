@@ -37,6 +37,7 @@ export interface Colors {
 	error: string;
 	info: string;
 	warning: string;
+	shell: string;
 	diffAdded: string;
 	diffRemoved: string;
 	diffAddedText: string;
@@ -66,3 +67,4 @@ export type ThemePreset =
 	| 'deep-sea'
 	| 'volcanic-ash'
 	| 'cyberpunk-mint';
+

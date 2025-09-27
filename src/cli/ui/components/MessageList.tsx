@@ -112,8 +112,8 @@ export const MessageList: React.FC<MessageListProps> = ({
       message.toolCalls.forEach((toolCall, toolIndex) => {
         // Check if this is an image read that should be hidden
         const isImageRead = toolCall.name === 'read_file' &&
-                           toolCall.result?.output &&
-                           (toolCall.result.output as any).type === 'image';
+                           toolCall.result?.llmContent &&
+                           toolCall.result.llmContent.includes('Successfully read image:');
 
         // Only add the Box wrapper if we're actually showing the tool
         if (!isImageRead) {

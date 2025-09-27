@@ -1,106 +1,150 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Box, Text } from 'ink';
-import type { ToolCall } from '../core/types.js';
+import type { ToolCall, ToolResultDisplay, TaskListDisplay } from '../core/types.js';
 import { toolRegistry } from '../core/ToolRegistry.js';
-import { MessageIndicators } from '../../cli/ui/constants.js';
 import { useTheme } from '../../cli/ui/hooks/useTheme.js';
-import { TaskDisplay } from './TaskDisplay.js';
+import type { ToolStatus } from '../core/types.js';
+import { PillBadge } from './PillBadge.js';
+import { TaskList } from './components/TaskList.js';
+
+const BRANCH_INDICATOR = '└>';
+const INDENT_SIZE = 3;
+const DEFAULT_MAX_LINES = 10;
 
 interface ToolMessageProps {
   toolCall: ToolCall;
+  maxOutputLines?: number;
 }
 
-export const ToolMessage: React.FC<ToolMessageProps> = ({ toolCall }) => {
-  const { colors } = useTheme();
-  // Get the tool instance to access display name and formatters
-  const tool = toolRegistry.get(toolCall.name);
-  const displayName = tool?.displayName || toolCall.name;
-  const formattedParams = tool ? tool.formatParams(toolCall.input as Record<string, unknown>) : JSON.stringify(toolCall.input);
+interface ParsedResult {
+  description?: string;
+  outputLines: string[];
+}
 
-  const getStatusIndicator = () => {
-    return MessageIndicators.Tool;
-  };
+function getStatusColor(status: ToolStatus, colors: ReturnType<typeof useTheme>['colors']): string {
+  switch (status) {
+    case 'pending':
+    case 'executing':
+      return colors.secondary;
+    case 'completed':
+      return colors.success;
+    case 'failed':
+      return colors.error;
+    default:
+      return colors.secondary;
+  }
+}
 
-  const getStatusColor = () => {
-    switch (toolCall.status) {
-      case 'pending':
-      case 'executing':
-        return colors.secondary;
-      case 'completed':
-        return colors.success;
-      case 'failed':
-        return colors.error;
-      default:
-        return colors.secondary;
-    }
-  };
-
-  // Check if we should hide this tool call completely
-  const shouldHideToolCall = () => {
-    // Hide Read File tool when reading images
-    if (toolCall.name === 'read_file' && toolCall.result?.output) {
-      const output = toolCall.result.output as any;
-      return output && typeof output === 'object' && output.type === 'image';
-    }
-    return false;
-  };
-
-  // Check if we should show full display content for this tool
-  const shouldShowFullDisplay = () => {
-    return toolCall.name === 'write_tasks' && toolCall.result?.display?.content;
-  };
-
-  // Get one-line summary of result
-  const getResultSummary = () => {
-    if (!toolCall.result) return null;
-
-    if (tool) {
-      return tool.summarizeResult(toolCall.result);
-    }
-
-    // Fallback if tool not found
-    if (!toolCall.result.success) {
-      return `Error: ${toolCall.result.error || 'Failed'}`;
-    }
-    return 'Completed';
-  };
-
-  const resultSummary = getResultSummary();
-
-  // Hide tool call completely if needed (e.g., image reads)
-  if (shouldHideToolCall()) {
-    return null;
+function parseResultDisplay(resultDisplay: ToolResultDisplay | undefined): ParsedResult {
+  if (typeof resultDisplay !== 'string') {
+    return { outputLines: [] };
   }
 
-  // For TodoWrite tool, only show the full display content
-  if (shouldShowFullDisplay() && toolCall.result?.display?.content) {
+  const lines = resultDisplay.trim().split('\n');
+  if (lines.length === 0) {
+    return { outputLines: [] };
+  }
+
+  return {
+    description: lines[0],
+    outputLines: lines.slice(1).filter(line => line.length > 0),
+  };
+}
+
+function formatToolTitle(displayName: string, formattedParams: string): string {
+  return `${displayName}(${formattedParams})`;
+}
+
+export const ToolMessage: React.FC<ToolMessageProps> = ({
+  toolCall,
+  maxOutputLines = DEFAULT_MAX_LINES,
+}) => {
+  const { colors } = useTheme();
+
+  const tool = useMemo(() => toolRegistry.get(toolCall.name), [toolCall.name]);
+  const displayName = tool?.displayName || toolCall.name;
+  const formattedParams = useMemo(
+    () => tool ? tool.formatParams(toolCall.input as Record<string, unknown>) : JSON.stringify(toolCall.input),
+    [tool, toolCall.input]
+  );
+
+  const statusColor = useMemo(
+    () => getStatusColor(toolCall.status, colors),
+    [toolCall.status, colors]
+  );
+
+  const titleText = formatToolTitle(displayName, formattedParams);
+  const resultDisplay = toolCall.result?.returnDisplay;
+
+  const isTaskList = resultDisplay &&
+    typeof resultDisplay === 'object' &&
+    'type' in resultDisplay &&
+    resultDisplay.type === 'task-list';
+
+  if (isTaskList) {
+    const taskList = resultDisplay as TaskListDisplay;
     return (
-      <Box>
-        <Text color={getStatusColor()}>{getStatusIndicator()} </Text>
-        <TaskDisplay content={toolCall.result.display.content} />
+      <Box flexDirection="column">
+        <PillBadge statusColor={statusColor} titleText={titleText} />
+        <TaskList tasks={taskList.tasks} />
       </Box>
     );
   }
 
-  // For other tools, show the standard format
+  const { description, outputLines } = useMemo(
+    () => parseResultDisplay(resultDisplay),
+    [resultDisplay]
+  );
+
+  const displayLines = outputLines.slice(0, maxOutputLines);
+  const hasMore = outputLines.length > maxOutputLines;
+  const hiddenCount = outputLines.length - maxOutputLines;
+
   return (
     <Box flexDirection="column">
-      {/* Main tool call line */}
-      <Box>
-        <Text color={getStatusColor()}>{getStatusIndicator()} </Text>
-        <Text>{displayName}({formattedParams})</Text>
-      </Box>
+      <PillBadge statusColor={statusColor} titleText={titleText} />
 
-      {/* Result summary with ⎿ branch */}
-      {resultSummary && (
-        <Box marginLeft={2}>
-          <Text color={colors.secondary} bold>{MessageIndicators.ToolResult}  </Text>
-          <Text color={colors.white}>
-            {resultSummary}
-          </Text>
-        </Box>
+      {description && (
+        <DescriptionLine statusColor={statusColor} description={description} />
+      )}
+
+      {displayLines.length > 0 && (
+        <OutputSection
+          displayLines={displayLines}
+          hasMore={hasMore}
+          hiddenCount={hiddenCount}
+          warningColor={colors.warning}
+        />
       )}
     </Box>
   );
 };
+
+const DescriptionLine: React.FC<{ statusColor: string; description: string }> = ({
+  statusColor,
+  description,
+}) => (
+  <Box marginLeft={INDENT_SIZE}>
+    <Text color={statusColor}>{BRANCH_INDICATOR}</Text>
+    <Text> {description}</Text>
+  </Box>
+);
+
+const OutputSection: React.FC<{
+  displayLines: string[];
+  hasMore: boolean;
+  hiddenCount: number;
+  warningColor: string;
+}> = ({ displayLines, hasMore, hiddenCount, warningColor }) => (
+  <Box flexDirection="column" marginLeft={INDENT_SIZE}>
+    {displayLines.map((line, idx) => (
+      <Text key={`output-${idx}`}>{line}</Text>
+    ))}
+    {hasMore && (
+      <Text color={warningColor}>
+        ... +{hiddenCount} more line{hiddenCount !== 1 ? 's' : ''}
+      </Text>
+    )}
+  </Box>
+);
 

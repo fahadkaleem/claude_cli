@@ -11,15 +11,11 @@ export class ToolExecutor {
 
     if (!tool) {
       return {
-        success: false,
-        output: null,
+        llmContent: `Tool "${toolName}" not found`,
+        returnDisplay: `Unknown tool: ${toolName}`,
         error: {
           message: `Tool "${toolName}" not found`,
           type: ToolErrorType.TOOL_NOT_FOUND
-        },
-        display: {
-          type: 'error',
-          content: `Unknown tool: ${toolName}`,
         },
       };
     }

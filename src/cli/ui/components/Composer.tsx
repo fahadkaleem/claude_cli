@@ -13,6 +13,7 @@ interface ComposerProps {
   onClearChat?: () => void;
   onDisplayLocalMessage?: (message: string) => void;
   onAbortOperation?: () => void;
+  addMessageToHistory: (content: string, role?: 'user' | 'assistant') => void;
 }
 
 export const Composer: React.FC<ComposerProps> = ({
@@ -23,7 +24,8 @@ export const Composer: React.FC<ComposerProps> = ({
   queuedMessages = [],
   onClearChat,
   onDisplayLocalMessage,
-  onAbortOperation
+  onAbortOperation,
+  addMessageToHistory
 }) => {
   return (
     <Box flexDirection="column">
@@ -47,6 +49,7 @@ export const Composer: React.FC<ComposerProps> = ({
         onClearChat={onClearChat}
         onDisplayLocalMessage={onDisplayLocalMessage}
         onAbortOperation={onAbortOperation}
+        addMessageToHistory={addMessageToHistory}
         isLoading={isLoading}
       />
     </Box>
