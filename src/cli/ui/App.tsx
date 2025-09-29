@@ -6,7 +6,7 @@ import { Footer } from './components/Footer.js';
 import { AppHeader } from './components/AppHeader.js';
 import { ThemeSelector } from './components/ThemeSelector.js';
 import { PermissionDialog } from './components/PermissionDialog.js';
-import { BashConfirmationDialog } from '../components/permissions/BashConfirmationDialog.js';
+import { ToolConfirmationDialog } from '../components/permissions/ToolConfirmationDialog.js';
 import { useUIState } from './contexts/UIStateContext.js';
 import { useUIActions } from './contexts/UIActionsContext.js';
 
@@ -23,6 +23,7 @@ export const App: React.FC = () => {
         isLoading={state.isLoading}
         localMessage={state.localMessage}
         hasPendingPermission={!!state.pendingPermission || !!state.pendingConfirmation}
+        client={state.client}
       />
 
       {state.currentDialog === 'theme-select' ? (
@@ -31,7 +32,7 @@ export const App: React.FC = () => {
           onCancel={actions.closeDialog}
         />
       ) : state.pendingConfirmation ? (
-        <BashConfirmationDialog
+        <ToolConfirmationDialog
           details={state.pendingConfirmation.details}
           onRespond={actions.respondToConfirmation}
         />

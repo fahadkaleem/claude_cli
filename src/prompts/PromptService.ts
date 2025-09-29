@@ -1,7 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { execSync } from 'child_process';
+import type { GitService } from '../services/GitService.js';
+import type { MessageLogger } from '../services/logging/MessageLogger.js';
 
 export interface ContextInfo {
   workingDirectory: string;
@@ -15,15 +16,19 @@ export interface ContextInfo {
 
 export class PromptService {
   private systemPromptPaths: string[];
-  private defaultSystemPrompt = `You are Alfred, a helpful CLI assistant with access to tools. Be concise, direct, and focused on helping with command-line tasks.
+  private readonly defaultSystemPrompt = `You are Alfred, a helpful CLI assistant with access to tools. Be concise, direct, and focused on helping with command-line tasks.
 
 Key guidelines:
 - Respond concisely - aim for 1-3 lines unless more detail is needed
 - Execute tools when appropriate to help the user
 - Prioritize clarity and accuracy
 - Focus on the specific task at hand`;
+  private gitInfo: { isGitRepo: boolean; branch?: string } | null = null;
 
-  constructor() {
+  constructor(
+    private readonly gitService: GitService,
+    private readonly logger: MessageLogger
+  ) {
     // Priority order for loading system prompts:
     this.systemPromptPaths = [];
 
@@ -56,49 +61,40 @@ Key guidelines:
   private loadSystemPrompt(): string {
     // Try each path in priority order
     for (const promptPath of this.systemPromptPaths) {
-      try {
-        if (fs.existsSync(promptPath)) {
+      if (fs.existsSync(promptPath)) {
+        // Log loading system prompt (not as a message since 'system' role doesn't exist)
+        if (this.logger.isEnabled()) {
           console.log(`Loading system prompt from: ${promptPath}`);
-          return fs.readFileSync(promptPath, 'utf-8');
         }
-      } catch (error) {
-        console.warn(`Failed to load system prompt from ${promptPath}:`, error);
+        return fs.readFileSync(promptPath, 'utf-8');
       }
     }
 
     // Fall back to default if no files found
-    console.log('Using default system prompt (no custom prompt files found)');
+    // Log using default prompt (not as a message since 'system' role doesn't exist)
+    if (this.logger.isEnabled()) {
+      console.log('Using default system prompt (no custom prompt files found)');
+    }
     return this.defaultSystemPrompt;
   }
 
   /**
-   * Check if current directory is a git repository
+   * Initialize git information asynchronously
    */
-  private isGitRepository(): boolean {
-    try {
-      execSync('git rev-parse --git-dir', { stdio: 'ignore' });
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Get current git branch if in a git repo
-   */
-  private getGitBranch(): string | undefined {
-    try {
-      return execSync('git branch --show-current', { encoding: 'utf-8' }).trim();
-    } catch {
-      return undefined;
-    }
+  async initializeGitInfo(): Promise<void> {
+    const isGitRepo = await this.gitService.isGitRepository();
+    const branch = isGitRepo ? await this.gitService.getCurrentBranch() : undefined;
+    this.gitInfo = { isGitRepo, branch };
   }
 
   /**
    * Gather dynamic context information
    */
-  getContextInfo(toolCount: number = 0): ContextInfo {
-    const isGitRepo = this.isGitRepository();
+  async getContextInfo(toolCount: number = 0): Promise<ContextInfo> {
+    // Initialize git info if not already done
+    if (!this.gitInfo) {
+      await this.initializeGitInfo();
+    }
 
     return {
       workingDirectory: process.cwd(),
@@ -109,8 +105,8 @@ Key guidelines:
         day: 'numeric'
       }),
       platform: process.platform,
-      isGitRepo,
-      gitBranch: isGitRepo ? this.getGitBranch() : undefined,
+      isGitRepo: this.gitInfo.isGitRepo,
+      gitBranch: this.gitInfo.branch,
       toolsAvailable: toolCount
     };
   }
@@ -161,8 +157,8 @@ Key guidelines:
   /**
    * Get the full system prompt with all context
    */
-  getSystemPrompt(toolCount: number = 0, customContext?: Record<string, unknown>): string {
-    const context = this.getContextInfo(toolCount);
+  async getSystemPrompt(toolCount: number = 0, customContext?: Record<string, unknown>): Promise<string> {
+    const context = await this.getContextInfo(toolCount);
     if (customContext) {
       context.customContext = customContext;
     }
@@ -193,13 +189,10 @@ Key guidelines:
     // Only write if file doesn't exist
     if (!fs.existsSync(userConfigPath)) {
       fs.writeFileSync(userConfigPath, promptContent, 'utf-8');
-      console.log(`Created system prompt file at: ${userConfigPath}`);
-      console.log('You can customize this file to change the assistant\'s behavior.');
-    } else {
-      console.log(`System prompt already exists at: ${userConfigPath}`);
+      // Log using console.log instead (since 'system' role doesn't exist in Message type)
+      if (this.logger.isEnabled()) {
+        console.log(`Created system prompt file at: ${userConfigPath}`);
+      }
     }
   }
 }
-
-// Singleton instance
-export const promptService = new PromptService();

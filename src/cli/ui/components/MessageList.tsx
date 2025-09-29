@@ -3,15 +3,18 @@ import { Box, Text } from 'ink';
 import Markdown from '@inkkit/ink-markdown';
 import { Message } from '../types';
 import { ToolMessage } from '../../../tools/ui/ToolMessage.js';
+import { ToolCall, ToolStatus } from '../../../tools/core/types.js';
 import { MessageIndicators, Colors, DisplayType, LoadingMessages, InterruptedIndicator } from '../constants.js';
 import { ThinkingAnimation } from '../../../ui/components/ThinkingAnimation.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useTheme } from '../hooks/useTheme.js';
+import { extractTextContent, extractToolUseBlocks } from '../utils/messageUtils.js';
 
 interface MessageListProps {
   messages: Message[];
   isLoading: boolean;
   hasPendingPermission?: boolean;
+  client?: any; // AnthropicClient instance for getting tool results
 }
 
 // Helper to check and split interrupted messages
@@ -31,6 +34,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   messages,
   isLoading,
   hasPendingPermission = false,
+  client,
 }) => {
   const { settings } = useSettings();
   const { colors } = useTheme();
@@ -38,52 +42,65 @@ export const MessageList: React.FC<MessageListProps> = ({
   const messageElements: React.ReactNode[] = [];
 
   messages.forEach((message, index) => {
+    // Generate unique key for this message
+    const messageKey = `msg-${index}-${message.timestamp?.getTime() || Date.now()}`;
+
     // Add the message itself
     if (message.role === 'user') {
       // Use displayContent if available (with placeholders), otherwise use content
-      const contentToDisplay = message.displayContent || message.content;
-      const { isInterrupted, mainContent, interruptLine } = parseInterruptedMessage(contentToDisplay);
+      const contentToDisplay = message.displayContent || extractTextContent(message.content);
 
-      if (isInterrupted) {
-        // Display user message with interrupted indicator
-        messageElements.push(
-          <Box key={`msg-${index}`} marginBottom={1} flexDirection="column">
-            <Text color={Colors.User}>
-              {MessageIndicators.User} {mainContent}
-            </Text>
-            <Text color={Colors.Error}>
-              {interruptLine}
-            </Text>
-          </Box>
-        );
+      // Skip rendering user messages that only contain tool_result blocks (no actual text)
+      // These are internal API messages, not user messages
+      if (!contentToDisplay || contentToDisplay.trim() === '') {
+        // This is a tool_result message, skip displaying it
+        // (Tools display their results in the tool UI component instead)
       } else {
-        // Normal user message
-        messageElements.push(
-          <Box key={`msg-${index}`} marginBottom={1}>
-            <Text color={Colors.User}>
-              {MessageIndicators.User} {contentToDisplay}
-            </Text>
-          </Box>
-        );
+        const { isInterrupted, mainContent, interruptLine } = parseInterruptedMessage(contentToDisplay);
+
+        if (isInterrupted) {
+          // Display user message with interrupted indicator
+          messageElements.push(
+            <Box key={`${messageKey}-interrupted`} marginBottom={1} flexDirection="column">
+              <Text color={Colors.User}>
+                {MessageIndicators.User} {mainContent}
+              </Text>
+              <Text color={Colors.Error}>
+                {interruptLine}
+              </Text>
+            </Box>
+          );
+        } else {
+          // Normal user message
+          messageElements.push(
+            <Box key={messageKey} marginBottom={1}>
+              <Text color={Colors.User}>
+                {MessageIndicators.User} {contentToDisplay}
+              </Text>
+            </Box>
+          );
+        }
       }
     } else if (message.role === 'system') {
       // System messages - show as error with system indicator, indented
+      const systemContent = extractTextContent(message.content);
       messageElements.push(
-        <Box key={`msg-${index}`}>
+        <Box key={messageKey}>
           <Text color={Colors.Error}>
-            {'  '}{MessageIndicators.System}  {message.content}
+            {'  '}{MessageIndicators.System}  {systemContent}
           </Text>
         </Box>
       );
     } else {
       // Assistant messages - render as markdown only if there's content
-      if (message.content && message.content.trim()) {
-        const { isInterrupted, mainContent, interruptLine } = parseInterruptedMessage(message.content);
+      const assistantContent = extractTextContent(message.content);
+      if (assistantContent && assistantContent.trim()) {
+        const { isInterrupted, mainContent, interruptLine } = parseInterruptedMessage(assistantContent);
 
         if (isInterrupted) {
           // Display assistant message with interrupted indicator
           messageElements.push(
-            <Box key={`msg-${index}`} marginBottom={1} flexDirection="column">
+            <Box key={`${messageKey}-interrupted`} marginBottom={1} flexDirection="column">
               <Box>
                 <Text color={Colors.Assistant}>{MessageIndicators.Assistant} </Text>
                 <Box flexGrow={1}>
@@ -98,10 +115,10 @@ export const MessageList: React.FC<MessageListProps> = ({
         } else {
           // Normal assistant message
           messageElements.push(
-            <Box key={`msg-${index}`} marginBottom={1}>
+            <Box key={messageKey} marginBottom={1}>
               <Text color={Colors.Assistant}>{MessageIndicators.Assistant} </Text>
               <Box flexGrow={1}>
-                <Markdown>{message.content}</Markdown>
+                <Markdown>{mainContent}</Markdown>
               </Box>
             </Box>
           );
@@ -109,23 +126,26 @@ export const MessageList: React.FC<MessageListProps> = ({
       }
     }
 
-    // Add tool calls as separate items after the message
-    if (message.toolCalls && message.toolCalls.length > 0) {
-      message.toolCalls.forEach((toolCall, toolIndex) => {
+    // Extract and display tool_use blocks from ContentBlock[]
+    const toolUseBlocks = extractToolUseBlocks(message.content);
+    if (toolUseBlocks.length > 0 && client) {
+      toolUseBlocks.forEach((toolBlock, toolIndex) => {
+        // Get full tool result with returnDisplay from client
+        const toolResult = client.getToolResult(toolBlock.id);
 
-        // Check if this is an image read that should be hidden
-        const isImageRead = toolCall.name === 'read_file' &&
-                           toolCall.result?.llmContent &&
-                           toolCall.result.llmContent.includes('Successfully read image:');
+        const toolCall: ToolCall = {
+          id: toolBlock.id,
+          name: toolBlock.name,
+          input: toolBlock.input,
+          status: toolResult?.error ? ToolStatus.Failed : ToolStatus.Completed,
+          result: toolResult // Full ToolResult with llmContent + returnDisplay
+        };
 
-        // Only add the Box wrapper if we're actually showing the tool
-        if (!isImageRead) {
-          messageElements.push(
-            <Box key={`msg-${index}-tool-${toolIndex}`} marginBottom={1}>
-              <ToolMessage toolCall={toolCall} />
-            </Box>
-          );
-        }
+        messageElements.push(
+          <Box key={`${messageKey}-tool-${toolIndex}`} marginBottom={1}>
+            <ToolMessage toolCall={toolCall} />
+          </Box>
+        );
       });
     }
   });

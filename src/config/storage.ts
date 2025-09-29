@@ -23,4 +23,7 @@ export class Storage {
   }
 }
 
+// Storage is now created in Config class, no singleton
+// But we keep this for backward compatibility with alfredConfig.ts
+// TODO: Refactor alfredConfig.ts to use DI
 export const storage = new Storage(process.cwd());

@@ -52,7 +52,7 @@ export interface ToolResult {
 
 /**
  * Discriminated union for tool display results.
- * Based on gemini's pattern - tools return data structures, UI decides how to render.
+ * Tools return data structures, UI decides how to render.
  */
 export type ToolResultDisplay =
   | string              // Simple markdown or text

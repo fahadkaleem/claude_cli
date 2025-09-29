@@ -10,12 +10,6 @@ export interface ImageData {
   filePath: string;
 }
 
-/**
- * Saves a base64 image to a temporary file
- * @param base64Image Base64 encoded image data
- * @param imageNumber Unique identifier for this image
- * @returns Image data with file path, or null if save failed
- */
 export async function saveClipboardImage(
   base64Image: string,
   imageNumber: number
@@ -41,12 +35,6 @@ export async function saveClipboardImage(
   }
 }
 
-/**
- * Converts an absolute file path to a relative path if within current working directory
- * @param absolutePath Absolute file path
- * @param cwd Current working directory (defaults to process.cwd())
- * @returns Relative path if within cwd, otherwise absolute path
- */
 export function toRelativePathIfPossible(
   absolutePath: string,
   cwd: string = process.cwd()
@@ -66,10 +54,6 @@ export function toRelativePathIfPossible(
   }
 }
 
-/**
- * Cleans up old temporary clipboard image files
- * Removes files older than 1 hour
- */
 export async function cleanupOldClipboardImages(): Promise<void> {
   try {
     const tempDir = path.join(os.tmpdir(), TEMP_DIR_NAME);
@@ -94,12 +78,6 @@ export async function cleanupOldClipboardImages(): Promise<void> {
   }
 }
 
-/**
- * Formats pasted text placeholder with line count
- * @param text The pasted text
- * @param pasteNumber Unique identifier for this paste
- * @returns Placeholder string
- */
 export function formatTextPastePlaceholder(
   text: string,
   pasteNumber: number
@@ -108,21 +86,10 @@ export function formatTextPastePlaceholder(
   return `[Pasted text #${pasteNumber} +${newlineCount} lines]`;
 }
 
-/**
- * Formats image placeholder
- * @param imageNumber Unique identifier for this image
- * @returns Placeholder string
- */
 export function formatImagePlaceholder(imageNumber: number): string {
   return `[Image #${imageNumber}]`;
 }
 
-/**
- * Replaces text paste placeholders with actual content
- * @param value Input value with placeholders
- * @param pastedTexts Map of paste number to text content
- * @returns Processed value with text expanded
- */
 export function expandTextPastes(
   value: string,
   pastedTexts: Map<number, string>
@@ -137,13 +104,6 @@ export function expandTextPastes(
   return result;
 }
 
-/**
- * Replaces image placeholders with @file references
- * @param value Input value with placeholders
- * @param pastedImages Map of image number to image data
- * @param useRelativePaths Whether to use relative paths (default: true)
- * @returns Processed value with image placeholders replaced
- */
 export function expandImagePastes(
   value: string,
   pastedImages: Map<number, ImageData>,

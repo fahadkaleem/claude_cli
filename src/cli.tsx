@@ -3,8 +3,9 @@ import React from 'react';
 import { render } from 'ink';
 import meow from 'meow';
 import { AppContainer } from './cli/ui/AppContainer.js';
-import { promptService } from './services/PromptService.js';
 import { setOriginalCwd } from './tools/utils/permissions.js';
+import { initializeApp } from './core/initializer.js';
+import { Config } from './config/Config.js';
 
 const cli = meow(`
   Usage
@@ -66,13 +67,31 @@ setOriginalCwd(process.cwd());
 
 // Handle --init-prompt flag
 if (cli.flags.initPrompt) {
-  promptService.initializeSystemPromptFile()
+  // Create a temporary config just for initializing the prompt file
+  const tempConfig = Config.fromEnvironment();
+  tempConfig.initialize()
+    .then(() => tempConfig.getPromptService().initializeSystemPromptFile())
     .then(() => process.exit(0))
     .catch(error => {
       console.error('Failed to initialize system prompt:', error);
       process.exit(1);
     });
 } else {
-  const { waitUntilExit } = render(<AppContainer model={cli.flags.model} />);
-  waitUntilExit().catch(console.error);
+  // Initialize app BEFORE rendering
+  // ALL initialization happens here, then we just render
+  initializeApp()
+    .then(({ config, client }) => {
+      const { waitUntilExit } = render(
+        <AppContainer
+          model={cli.flags.model}
+          client={client}
+          config={config}
+        />
+      );
+      return waitUntilExit();
+    })
+    .catch(error => {
+      console.error('Fatal initialization error:', error);
+      process.exit(1);
+    });
 }

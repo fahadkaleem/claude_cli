@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { Box, Text } from 'ink';
 import SelectInput from 'ink-select-input';
-import type { ToolCallConfirmationDetails, ToolConfirmationOutcome } from '../../../core/permissions/types.js';
+import {
+  type ToolCallConfirmationDetails,
+  ToolConfirmationOutcome
+} from '../../../core/permissions/types.js';
 
 interface PermissionDialogProps {
   confirmationDetails: ToolCallConfirmationDetails;
@@ -32,25 +35,25 @@ export const PermissionDialog: React.FC<PermissionDialogProps> = ({
     const options: SelectItem[] = [
       {
         label: 'Yes, allow once',
-        value: 'proceed_once' as ToolConfirmationOutcome,
+        value: ToolConfirmationOutcome.ProceedOnce,
       },
     ];
 
     if (confirmationDetails.type === 'exec' && confirmationDetails.rootCommand) {
       options.push({
         label: `Yes, allow all ${confirmationDetails.rootCommand} commands`,
-        value: 'proceed_always_prefix' as ToolConfirmationOutcome,
+        value: ToolConfirmationOutcome.ProceedAlwaysPrefix,
       });
     }
 
     options.push({
-      label: 'Yes, allow this exact command always',
-      value: 'proceed_always' as ToolConfirmationOutcome,
+      label: 'Yes, allow for this session',
+      value: ToolConfirmationOutcome.ProceedAlways,
     });
 
     options.push({
       label: 'No, cancel (Esc)',
-      value: 'cancel' as ToolConfirmationOutcome,
+      value: ToolConfirmationOutcome.Cancel,
     });
 
     return options;

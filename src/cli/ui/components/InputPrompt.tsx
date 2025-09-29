@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from './TextInput.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
-import { commandService } from '../../../services/CommandService.js';
-import { registerBuiltInCommands } from '../commands/registerCommands.js';
+import { useConfig } from '../contexts/ConfigContext.js';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts.js';
 import { useDialog } from '../contexts/DialogContext.js';
 import { useTheme } from '../hooks/useTheme.js';
@@ -36,10 +35,9 @@ interface InputPromptProps {
   isLoading?: boolean;
 }
 
-// Initialize commands once
-registerBuiltInCommands();
-
 export const InputPrompt: React.FC<InputPromptProps> = ({ onSubmit, onClearChat, onDisplayLocalMessage, onAbortOperation, addMessageToHistory, isLoading = false }) => {
+  const config = useConfig();
+  const commandService = config.getCommandService();
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState<SlashCommand[]>([]);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);

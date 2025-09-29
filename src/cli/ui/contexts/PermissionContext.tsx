@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { permissionManager } from '../../../services/PermissionManager.js';
+import { useConfig } from './ConfigContext.js';
 import type { PermissionRequestData } from '../../../tools/core/types.js';
 import type { ToolCallConfirmationDetails, ToolConfirmationOutcome } from '../../../core/permissions/types.js';
 
@@ -19,11 +19,15 @@ interface PermissionContextType {
   approvePermission: (permanent: boolean) => void;
   rejectPermission: () => void;
   respondToConfirmation: (outcome: ToolConfirmationOutcome) => void;
+  requestPermission: (toolId: string, data: PermissionRequestData) => Promise<boolean>;
+  requestConfirmation: (details: ToolCallConfirmationDetails) => Promise<ToolConfirmationOutcome>;
 }
 
 const PermissionContext = createContext<PermissionContextType | undefined>(undefined);
 
 export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const config = useConfig();
+  const permissionManager = config.getPermissionManager();
   const [pendingPermission, setPendingPermission] = useState<PendingPermission | null>(null);
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
 
@@ -66,13 +70,26 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
+  // Wrapper functions for toolExecutor
+  const requestPermission = async (toolId: string, data: PermissionRequestData): Promise<boolean> => {
+    const response = await permissionManager.requestPermission(toolId, data);
+    return response.approved;
+  };
+
+  const requestConfirmation = async (details: ToolCallConfirmationDetails): Promise<ToolConfirmationOutcome> => {
+    const confirmationId = `confirmation_${Date.now()}`;
+    return permissionManager.requestConfirmation(confirmationId, details);
+  };
+
   return (
     <PermissionContext.Provider value={{
       pendingPermission,
       pendingConfirmation,
       approvePermission,
       rejectPermission,
-      respondToConfirmation
+      respondToConfirmation,
+      requestPermission,
+      requestConfirmation
     }}>
       {children}
     </PermissionContext.Provider>

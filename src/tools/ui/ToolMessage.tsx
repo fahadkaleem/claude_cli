@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import Markdown from '@inkkit/ink-markdown';
 import type { ToolCall, ToolResultDisplay, TaskListDisplay, FileDiff, AnsiOutput } from '../core/types.js';
-import { toolRegistry } from '../core/ToolRegistry.js';
+import { useConfig } from '../../cli/ui/contexts/ConfigContext.js';
 import { useTheme } from '../../cli/ui/hooks/useTheme.js';
 import type { ToolStatus } from '../core/types.js';
 import { PillBadge } from './PillBadge.js';
@@ -65,8 +65,10 @@ function hasProperty<K extends string>(
 
 export const ToolMessage: React.FC<ToolMessageProps> = ({ toolCall }) => {
   const { colors } = useTheme();
+  const config = useConfig();
+  const toolRegistry = config.getToolRegistry();
 
-  const tool = useMemo(() => toolRegistry.get(toolCall.name), [toolCall.name]);
+  const tool = useMemo(() => toolRegistry.get(toolCall.name), [toolRegistry, toolCall.name]);
   const displayName = tool?.displayName || toolCall.name;
   const formattedParams = useMemo(
     () => tool ? tool.formatParams(toolCall.input as Record<string, unknown>) : JSON.stringify(toolCall.input),

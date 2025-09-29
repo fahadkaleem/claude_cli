@@ -4,21 +4,10 @@ import { getStatusInfo, type TaskStatus } from '../constants/taskIndicators.js';
 import { useTheme } from '../../../cli/ui/hooks/useTheme.js';
 
 interface BracketStatusProps {
-  /** The current status to display */
   status: TaskStatus;
-  /** Optional label to show next to the status */
   label?: string;
-  /** Whether to show the status text */
   showText?: boolean;
 }
-
-/**
- * Displays task status using bracket notation: [ ], [◐], [✓]
- *
- * @example
- * <BracketStatus status="completed" />
- * <BracketStatus status="in_progress" label="Building project" />
- */
 export const BracketStatus: React.FC<BracketStatusProps> = ({
   status,
   label,

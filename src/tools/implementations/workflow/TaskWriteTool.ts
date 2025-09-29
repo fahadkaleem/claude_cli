@@ -362,8 +362,13 @@ When in doubt, use this tool. Being proactive with task management demonstrates 
     // Get summary statistics
     const stats = this.calculateTaskStatistics(tasks);
 
+    // Format task list for LLM
+    const taskListString = tasks
+      .map((task, index) => `${index + 1}. [${task.status}] ${task.content}`)
+      .join('\n');
+
     const llmContent = tasks.length > 0
-      ? `Successfully updated the task list with ${stats.total} items (${stats.pending} pending, ${stats.inProgress} active, ${stats.completed} completed, ${stats.cancelled} cancelled)`
+      ? `Successfully updated the task list. The current list is now:\n${taskListString}`
       : 'Successfully cleared the task list';
 
     return {

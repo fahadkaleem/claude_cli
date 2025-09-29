@@ -1,18 +1,19 @@
 import type { ToolCall } from '../../tools/core/types.js';
+import type { ContentBlock } from '../../core/types.js';
 
 export interface Message {
   role: 'user' | 'assistant' | 'system';
-  content: string; // Content sent to API (with expanded @filepaths)
+  content: string | ContentBlock[]; // NEW: Support ContentBlock[] format (Anthropic API)
   displayContent?: string; // Optional display version (with placeholders like [Image #1])
   timestamp?: Date;
-  toolCalls?: ToolCall[];
+  toolCalls?: ToolCall[]; // DEPRECATED: Use ContentBlock[] format instead
   queued?: boolean; // Indicates message is queued while AI is processing
 }
 
 export interface ChatState {
   messages: Message[];
   isLoading: boolean;
-  error: string | null;
+  error?: string;
 }
 
 export interface Config {

@@ -29,7 +29,6 @@ export const AppHeader: React.FC = () => {
 			</Box>
 
 			<TitledBox
-				key={colors.primary}
 				borderStyle="round"
 				titles={[`cwd: ${process.cwd()}`]}
 				titleStyles={titleStyles.pill}

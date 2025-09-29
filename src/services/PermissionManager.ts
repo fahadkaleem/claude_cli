@@ -23,6 +23,9 @@ export class PermissionManager extends EventEmitter {
     details: ToolCallConfirmationDetails;
   }> = new Map();
 
+  // Simple session allowlist for edit permissions
+  private editAllowlist: Set<string> = new Set();
+
   constructor() {
     super();
   }
@@ -31,6 +34,11 @@ export class PermissionManager extends EventEmitter {
     toolId: string,
     data: PermissionRequestData
   ): Promise<PermissionResponse> {
+    // Check if edits are allowed for this session
+    if (this.editAllowlist.has('all-edits')) {
+      return Promise.resolve({ approved: true, permanent: true });
+    }
+
     return new Promise((resolve) => {
       this.pendingPermissions.set(toolId, { resolve, data });
       this.emit('permission-requested', toolId, data);
@@ -50,6 +58,10 @@ export class PermissionManager extends EventEmitter {
   respondToPermission(toolId: string, approved: boolean, permanent: boolean): void {
     const pending = this.pendingPermissions.get(toolId);
     if (pending) {
+      if (approved && permanent) {
+        // Add to edit allowlist for this session
+        this.editAllowlist.add('all-edits');
+      }
       pending.resolve({ approved, permanent });
       this.pendingPermissions.delete(toolId);
     }
@@ -78,6 +90,14 @@ export class PermissionManager extends EventEmitter {
   hasPendingConfirmation(confirmationId: string): boolean {
     return this.pendingConfirmations.has(confirmationId);
   }
+
+  hasEditPermission(): boolean {
+    return this.editAllowlist.has('all-edits');
+  }
+
+  clearSessionPermissions(): void {
+    this.editAllowlist.clear();
+  }
 }
 
-export const permissionManager = new PermissionManager();
+// PermissionManager is now created in Config class, no singleton

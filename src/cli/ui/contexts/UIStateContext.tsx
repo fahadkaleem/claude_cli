@@ -15,6 +15,7 @@ export interface UIState {
   currentTheme: string;
   pendingPermission: { toolId: string; data: PermissionRequestData } | null;
   pendingConfirmation: { confirmationId: string; details: ToolCallConfirmationDetails } | null;
+  client?: any; // AnthropicClient for tool results
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

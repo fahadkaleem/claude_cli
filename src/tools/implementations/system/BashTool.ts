@@ -2,7 +2,6 @@ import { Tool } from '../../core/Tool.js';
 import { ToolKind, ToolErrorType, type ToolResult, type ToolContext } from '../../core/types.js';
 import { ToolCallConfirmationDetails, ToolConfirmationOutcome } from '../../../core/permissions/types.js';
 import type { MessageBus } from '../../../core/permissions/MessageBus.js';
-import type { PermissionStorage } from '../../../core/policy/PermissionStorage.js';
 import { ShellExecutionService } from '../../../services/shellExecution.js';
 import { SAFE_COMMANDS, BANNED_COMMANDS } from '../../../core/policy/constants.js';
 
@@ -133,15 +132,11 @@ Important:
     required: ['command'],
   };
 
-  private readonly permissionStorage?: PermissionStorage;
+  private allowlist: Set<string> = new Set();
 
-  constructor(
-    messageBus?: MessageBus,
-    permissionStorage?: PermissionStorage,
-  ) {
+  constructor(messageBus?: MessageBus) {
     super();
     this.messageBus = messageBus;
-    this.permissionStorage = permissionStorage;
   }
 
   formatParams(params: BashToolParams): string {
@@ -180,25 +175,23 @@ Important:
   ): Promise<ToolCallConfirmationDetails | false> {
     const { command } = params;
 
+    // Check if command is in safe list
     if (SAFE_COMMANDS.has(command.trim())) {
       return false;
     }
 
-    if (!this.permissionStorage) {
+    // Extract command roots for checking
+    const commandRoots = this.getCommandRoots(command);
+    const commandsToConfirm = commandRoots.filter(
+      (cmd) => !this.allowlist.has(cmd)
+    );
+
+    // If all commands are already allowed, proceed
+    if (commandsToConfirm.length === 0) {
       return false;
     }
 
-    const permissionKey = `Bash(${command})`;
-
-    if (this.permissionStorage.hasPermission(permissionKey)) {
-      return false;
-    }
-
-    if (this.permissionStorage.hasMatchingPrefix(permissionKey)) {
-      return false;
-    }
-
-    const commandPrefix = this.extractCommandPrefix(command);
+    const commandPrefix = commandsToConfirm.join(', ');
 
     const confirmationDetails: ToolCallConfirmationDetails = {
       type: 'exec',
@@ -207,34 +200,41 @@ Important:
       description: `Execute: ${command}`,
       rootCommand: commandPrefix,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        if (outcome === ToolConfirmationOutcome.ProceedAlwaysPrefix && commandPrefix) {
-          const prefixKey = `Bash(${commandPrefix}:*)`;
-          this.permissionStorage?.addPermission(prefixKey);
-        } else if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          this.permissionStorage?.addPermission(permissionKey);
+        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+          // Add all command roots to allowlist for this session
+          commandsToConfirm.forEach((cmd) => this.allowlist.add(cmd));
         }
+        // ProceedOnce: Don't save anything
+        // Cancel: Don't save anything
       },
     };
 
     return confirmationDetails;
   }
 
-  private extractCommandPrefix(command: string): string {
+  private getCommandRoots(command: string): string[] {
     const parts = command.trim().split(/\s+/);
+    const roots: string[] = [];
+
+    if (!parts[0]) {
+      return [];
+    }
 
     // For git commands, include the subcommand (e.g., "git status", "git commit")
     // This prevents overly broad permissions like "git" which would allow dangerous commands
     if (parts[0] === 'git' && parts.length > 1) {
-      return `${parts[0]} ${parts[1]}`; // "git status", "git log", etc.
+      roots.push(`${parts[0]} ${parts[1]}`);
     }
-
     // For npm/yarn/pnpm, include the subcommand too
-    if ((parts[0] === 'npm' || parts[0] === 'yarn' || parts[0] === 'pnpm') && parts.length > 1) {
-      return `${parts[0]} ${parts[1]}`; // "npm install", "npm run", etc.
+    else if ((parts[0] === 'npm' || parts[0] === 'yarn' || parts[0] === 'pnpm') && parts.length > 1) {
+      roots.push(`${parts[0]} ${parts[1]}`);
+    }
+    // For other commands, just return the command name
+    else {
+      roots.push(parts[0]);
     }
 
-    // For other commands, just return the command name
-    return parts[0] || command;
+    return roots;
   }
 
   protected async run(params: BashToolParams, context?: ToolContext): Promise<ToolResult> {

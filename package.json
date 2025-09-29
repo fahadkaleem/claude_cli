@@ -8,8 +8,9 @@
   },
   "scripts": {
     "build": "tsc",
-    "dev": "tsx src/cli.tsx",
+    "dev": "ALFRED_DEBUG=1 ALFRED_ENABLE_LOGGING=1 tsx src/cli.tsx",
     "start": "node dist/cli.js",
+    "start:dev": "ALFRED_DEBUG=1 ALFRED_ENABLE_LOGGING=1 node dist/cli.js",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run build"
   },

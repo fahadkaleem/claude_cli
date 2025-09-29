@@ -1,8 +1,10 @@
 import React, { useState, useMemo, useCallback } from 'react';
+import { Box, Text } from 'ink';
 import { App } from './App.js';
 import { useChat } from './hooks/useChat.js';
+import { ChatClient } from '../../core/ChatClient.js';
+import { Config } from '../../config/Config.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
-import { useToolRegistration } from './hooks/useToolRegistration.js';
 import { ThemeContext } from './hooks/useTheme.js';
 import { getThemeColors } from './themes/config.js';
 import { UIStateContext } from './contexts/UIStateContext.js';
@@ -12,16 +14,19 @@ import { SettingsProvider } from './contexts/SettingsContext.js';
 import { ShellModeProvider } from './contexts/shellModeContext.js';
 import { PermissionProvider, usePermission } from './contexts/PermissionContext.js';
 import { PermissionDialog } from './components/PermissionDialog.js';
-import { Box } from 'ink';
+import { ConfigProvider } from './contexts/ConfigContext.js';
 
 interface AppContainerProps {
   model?: string;
+  client: ChatClient;
+  config: Config;
 }
 
-const AppContainerContent: React.FC<AppContainerProps> = ({ model }) => {
+const AppContainerContent: React.FC<AppContainerProps> = ({ model, client, config }) => {
   const [localMessage, setLocalMessage] = useState<string | null>(null);
 
-  const { isConnected } = useToolRegistration();
+  // Tools are now registered in Config during initialization
+  const isConnected = true; // Always true since initialization happens before UI
   const { currentDialog, closeDialog } = useDialog();
   const { currentTheme, setCurrentTheme, handleThemeSelect } = useThemeCommand(closeDialog);
   const { pendingPermission, pendingConfirmation, approvePermission, rejectPermission, respondToConfirmation } = usePermission();
@@ -34,8 +39,9 @@ const AppContainerContent: React.FC<AppContainerProps> = ({ model }) => {
     sendMessage,
     addMessageToHistory,
     clearChat,
-    abortOperation
-  } = useChat();
+    abortOperation,
+    client: chatClient
+  } = useChat(client, config);
 
   const themeContextValue = useMemo(
     () => ({
@@ -60,17 +66,18 @@ const AppContainerContent: React.FC<AppContainerProps> = ({ model }) => {
     () => ({
       messages,
       isLoading,
-      error,
+      error: error,
       isConnected,
       queuedMessages,
       localMessage,
       currentDialog,
-      model: model || 'claude-sonnet-4-20250514',
+      model: model || config.getModel(),
       currentTheme,
       pendingPermission,
       pendingConfirmation,
+      client: chatClient,
     }),
-    [messages, isLoading, error, isConnected, queuedMessages, localMessage, currentDialog, model, currentTheme, pendingPermission, pendingConfirmation]
+    [messages, isLoading, error, isConnected, queuedMessages, localMessage, currentDialog, model, config, currentTheme, pendingPermission, pendingConfirmation, chatClient]
   );
 
   const uiActions = useMemo(
@@ -89,6 +96,8 @@ const AppContainerContent: React.FC<AppContainerProps> = ({ model }) => {
     [handleThemeSelect, handleSubmit, handleClearChat, abortOperation, addMessageToHistory, closeDialog, approvePermission, rejectPermission, respondToConfirmation]
   );
 
+  // Since we fail fast now, initialization errors are handled before rendering
+
   return (
     <ShellModeProvider>
       <SettingsProvider>
@@ -105,11 +114,15 @@ const AppContainerContent: React.FC<AppContainerProps> = ({ model }) => {
 };
 
 export const AppContainer: React.FC<AppContainerProps> = (props) => {
+  // Since we fail fast now, initialization errors are handled before rendering
+
   return (
-    <DialogProvider>
-      <PermissionProvider>
-        <AppContainerContent {...props} />
-      </PermissionProvider>
-    </DialogProvider>
+    <ConfigProvider config={props.config}>
+      <DialogProvider>
+        <PermissionProvider>
+          <AppContainerContent {...props} />
+        </PermissionProvider>
+      </DialogProvider>
+    </ConfigProvider>
   );
 };

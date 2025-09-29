@@ -244,6 +244,7 @@ Input schema: {'type': 'object', 'properties': {'file_path': {'type': 'string', 
 
       // Read the file as text
       const content = readFileSync(absolutePath, 'utf-8');
+
       const lines = content.split('\n');
       const totalLines = lines.length;
 

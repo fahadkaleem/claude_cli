@@ -1,171 +1,158 @@
-import { useState, useCallback, useRef } from 'react';
-import { Message, ChatState } from '../types';
-import { chatService } from '../../../services/anthropic.js';
-import type { ToolCall } from '../../../tools/core/types.js';
-import { InterruptedIndicator } from '../constants.js';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { Message, ChatState } from '../types.js';
+import { ChatClient } from '../../../core/ChatClient.js';
+import { EventType, ContentBlock } from '../../../core/types.js';
+import type { Config } from '../../../config/Config.js';
+import { usePermission } from '../contexts/PermissionContext.js';
 
-export const useChat = () => {
+export const useChat = (client: ChatClient, config: Config) => {
   const [state, setState] = useState<ChatState>({
-    messages: chatService.getMessages(),
+    messages: [],
     isLoading: false,
-    error: null
+    error: undefined
   });
 
-  // Separate state for queued messages
   const [queuedMessages, setQueuedMessages] = useState<string[]>([]);
-
-  // Message queue for when AI is processing
   const messageQueue = useRef<Array<{content: string, display?: string}>>([]);
   const isProcessing = useRef(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const abortControllerRef = useRef<AbortController | undefined>(undefined);
 
-  // Add message to history without invoking Claude
-  const addMessageToHistory = useCallback((content: string, role: 'user' | 'assistant' = 'user') => {
-    if (role === 'user') {
-      chatService.addUserMessage(content, content);
-    } else {
-      chatService.addAssistantMessage(content, content);
+  // Pending text accumulator (for streaming text)
+  const pendingTextRef = useRef<string>('');
+
+  const { requestPermission, requestConfirmation } = usePermission();
+
+  useEffect(() => {
+    // Wire up permission system
+    if (config) {
+      const toolExecutor = config.getToolExecutor();
+      toolExecutor.onPermissionRequired = requestPermission;
+      toolExecutor.onConfirmationRequired = requestConfirmation;
     }
-    // Force state update with a new array reference
-    setState(prev => ({
-      ...prev,
-      messages: [...chatService.getMessages()]
-    }));
-  }, []);
 
-  // Process a single message
+    // Load initial history if client is available
+    if (client && client.isInitialized()) {
+      setState(prev => ({
+        ...prev,
+        messages: client.getHistory()
+      }));
+    }
+  }, [client, config, requestPermission, requestConfirmation]);
+
   const processMessage = useCallback(async (
     content: string,
     displayContent: string | undefined,
     additionalMessages: Array<{content: string, display?: string}> = []
   ) => {
-    isProcessing.current = true;
+    if (!client || !client.isInitialized()) {
+      setState(prev => ({
+        ...prev,
+        error: 'Client not initialized'
+      }));
+      return;
+    }
 
-    // Create new abort controller for this request
+    isProcessing.current = true;
     abortControllerRef.current = new AbortController();
     const signal = abortControllerRef.current.signal;
 
-    // Track if this turn was cancelled
-    let wasCancelled = false;
-
-    // Combine all messages with proper indentation
     let combinedMessage = content.trim();
-    let combinedDisplay = displayContent?.trim() || content.trim();
-
     if (additionalMessages.length > 0) {
-      // Add queued messages with 2-space indentation to align with "> "
       const indentedMessages = additionalMessages.map(m => m.content.trim()).join('\n  ');
-      const indentedDisplays = additionalMessages.map(m => (m.display || m.content).trim()).join('\n  ');
       combinedMessage += '\n  ' + indentedMessages;
-      combinedDisplay += '\n  ' + indentedDisplays;
     }
 
-    // Add combined message to the service (content for API, displayContent for UI)
-    chatService.addUserMessage(combinedMessage, combinedDisplay);
-
-    // Clear queued messages once they're sent
     setQueuedMessages([]);
     messageQueue.current = [];
 
-    // Update UI with the new message immediately
+    // Show user message immediately
+    const userMsg: Message = {
+      role: 'user',
+      content: combinedMessage,
+      timestamp: new Date()
+    };
+
     setState(prev => ({
       ...prev,
-      messages: chatService.getMessages(),
+      messages: [...prev.messages, userMsg],
       isLoading: true,
-      error: null
+      error: undefined
     }));
 
     try {
-      // Process the response stream with the combined message
-      for await (const step of chatService.sendMessage(combinedMessage, signal)) {
-        switch (step.type) {
-          case 'assistant': {
-            // Update messages from service (it manages the history now)
+      // Reset pending text
+      pendingTextRef.current = '';
+
+      for await (const event of client.sendMessageStream(combinedMessage, signal)) {
+        switch (event.type) {
+          case EventType.Content:
+            // Accumulate text
+            pendingTextRef.current += event.content;
+
+            // Update UI: history + user message + pending text
+            setState(prev => {
+              const history = client.getHistory();
+              const pendingMsg: Message = {
+                role: 'assistant',
+                content: pendingTextRef.current,
+                timestamp: new Date()
+              };
+              return {
+                ...prev,
+                messages: [...history, pendingMsg],
+                isLoading: true
+              };
+            });
+            break;
+
+          case EventType.ToolExecuting:
+          case EventType.ToolComplete:
+            // Clear pending text when tools start
+            pendingTextRef.current = '';
+
+            // Show updated history
             setState(prev => ({
               ...prev,
-              messages: chatService.getMessages(),
-              isLoading: true // Still processing if there are tools
+              messages: client.getHistory(),
+              isLoading: true
             }));
             break;
-          }
 
-          case 'tool-executing': {
-            // Update the tool status in the UI
-            setState(prev => {
-              const messages = chatService.getMessages();
-              const lastMessage = messages[messages.length - 1];
-
-              if (lastMessage?.toolCalls) {
-                const toolCall = lastMessage.toolCalls.find(
-                  tc => tc.id === step.toolCall.id
-                );
-                if (toolCall) {
-                  toolCall.status = step.toolCall.status;
-                }
-              }
-
-              return {
-                ...prev,
-                messages: [...messages], // Force re-render
-                isLoading: true
-              };
-            });
+          case EventType.Thinking:
             break;
-          }
 
-          case 'tool-complete': {
-            // Update tool with result
-            setState(prev => {
-              const messages = chatService.getMessages();
-              const lastMessage = messages[messages.length - 1];
-
-
-              if (lastMessage?.toolCalls) {
-                const toolCall = lastMessage.toolCalls.find(
-                  tc => tc.id === step.toolCall.id
-                );
-                if (toolCall) {
-                  Object.assign(toolCall, step.toolCall);
-                }
-              }
-
-              return {
-                ...prev,
-                messages: [...messages], // Force re-render
-                isLoading: true
-              };
-            });
-            break;
-          }
-
-          case 'thinking': {
-            // Just keep loading state
-            break;
-          }
-
-          case 'complete': {
-            // Final state update
+          case EventType.Complete:
+            pendingTextRef.current = '';
             setState(prev => ({
               ...prev,
-              messages: chatService.getMessages(),
+              messages: client.getHistory(),
               isLoading: false
             }));
             break;
-          }
+
+          case EventType.Error:
+            pendingTextRef.current = '';
+            setState(prev => ({
+              ...prev,
+              messages: client.getHistory(),
+              isLoading: false,
+              error: event.error.message
+            }));
+            break;
         }
       }
     } catch (error) {
-      // Check if it was an abort error
-      const isAborted = error instanceof Error && (error.message === 'AbortError' || error.name === 'AbortError');
-      wasCancelled = isAborted;
+      const isAborted = error instanceof Error &&
+        (error.message === 'AbortError' || error.name === 'AbortError');
+
+      pendingTextRef.current = '';
 
       if (isAborted) {
-        // Just clear the loading state - interrupted message already added in abortOperation
         setState(prev => ({
           ...prev,
-          messages: chatService.getMessages(),
+          messages: client.getHistory(),
           isLoading: false,
-          error: null
+          error: undefined
         }));
       } else {
         setState(prev => ({
@@ -176,80 +163,48 @@ export const useChat = () => {
       }
     } finally {
       isProcessing.current = false;
-      abortControllerRef.current = null;
-      // Process next message in queue if any with all queued messages
-      if (messageQueue.current.length > 0) {
-        const allQueued = [...messageQueue.current];
-        const nextMessage = allQueued.shift();
-        if (nextMessage) {
-          messageQueue.current = [];
-          setQueuedMessages([]);
-          // Process the next message along with all other queued messages
-          setTimeout(() => processMessage(nextMessage.content, nextMessage.display, allQueued), 0);
-        }
-      }
     }
-  }, []);
+  }, [client]);
 
-  // Public sendMessage function that queues messages
-  const sendMessage = useCallback(async (content: string, displayContent?: string) => {
-    if (!content.trim()) return;
-
-    // If not processing, process immediately with any existing queued messages
-    if (!isProcessing.current) {
-      const queued = [...messageQueue.current];
-      messageQueue.current = [];
-      setQueuedMessages([]);
-      await processMessage(content, displayContent, queued);
-    } else {
-      // Add to queue if already processing
-      const queueItem = {content, display: displayContent};
-      messageQueue.current.push(queueItem);
-      setQueuedMessages(prev => [...prev, (displayContent || content).trim()]);
+  const sendMessage = useCallback((content: string, displayContent?: string) => {
+    if (isProcessing.current) {
+      messageQueue.current.push({ content, display: displayContent });
+      setQueuedMessages(prev => [...prev, content]);
+      return;
     }
+    processMessage(content, displayContent, []);
   }, [processMessage]);
 
-  const clearError = useCallback(() => {
-    setState(prev => ({ ...prev, error: null }));
+  const abortResponse = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = undefined;
+    }
+    pendingTextRef.current = '';
+    setState(prev => ({
+      ...prev,
+      isLoading: false
+    }));
   }, []);
 
   const clearChat = useCallback(() => {
-    chatService.clearMessages();
+    client?.clearHistory();
+    pendingTextRef.current = '';
     setState({
       messages: [],
       isLoading: false,
-      error: null
+      error: undefined
     });
-  }, []);
-
-  const abortOperation = useCallback(() => {
-    // If there's an active abort controller, abort it
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-
-    // Immediately append interrupted message to the last message
-    const messages = chatService.getMessages();
-    if (messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
-      // Only add if not already interrupted
-      if (!lastMessage.content.includes(InterruptedIndicator)) {
-        lastMessage.content = lastMessage.content + '\n  ' + InterruptedIndicator;
-      }
-    }
-
-    // Clear the loading state and update messages
-    setState(prev => ({
-      ...prev,
-      messages: chatService.getMessages(),
-      isLoading: false
-    }));
-
-    // Clear processing flag and queued messages
-    isProcessing.current = false;
     setQueuedMessages([]);
     messageQueue.current = [];
+  }, [client]);
+
+  const addMessageToHistory = useCallback((content: string, role: 'user' | 'assistant' = 'user') => {
+    // Not used
+  }, []);
+
+  const clearError = useCallback(() => {
+    setState(prev => ({ ...prev, error: null }));
   }, []);
 
   return {
@@ -258,9 +213,12 @@ export const useChat = () => {
     error: state.error,
     queuedMessages,
     sendMessage,
-    addMessageToHistory,
-    clearError,
+    abortResponse,
+    abortOperation: abortResponse,
     clearChat,
-    abortOperation
+    clearError,
+    addMessageToHistory,
+    isConnected: true,
+    client
   };
 };

@@ -1,4 +1,4 @@
-import { toolRegistry } from './ToolRegistry.js';
+import type { ToolRegistry } from './ToolRegistry.js';
 import { ToolErrorType, type ToolResult, type ToolContext, type ToolCall, type ToolStatus, type PermissionRequestData } from './types.js';
 import { revokeWritePermission } from '../utils/permissions.js';
 import { ToolCallConfirmationDetails, ToolConfirmationOutcome } from '../../core/permissions/types.js';
@@ -6,6 +6,8 @@ import { ToolCallConfirmationDetails, ToolConfirmationOutcome } from '../../core
 export class ToolExecutor {
   onPermissionRequired?: (toolId: string, data: PermissionRequestData) => Promise<boolean>;
   onConfirmationRequired?: (details: ToolCallConfirmationDetails) => Promise<ToolConfirmationOutcome>;
+
+  constructor(private readonly toolRegistry: ToolRegistry) {}
 
   private formatRejectionMessage(toolName: string, data: PermissionRequestData): string {
     if (data.file_path) {
@@ -20,7 +22,7 @@ export class ToolExecutor {
     params: unknown,
     context?: ToolContext
   ): Promise<ToolResult> {
-    const tool = toolRegistry.get(toolName);
+    const tool = this.toolRegistry.get(toolName);
 
     if (!tool) {
       return {
@@ -107,5 +109,3 @@ export class ToolExecutor {
     return results;
   }
 }
-
-export const toolExecutor = new ToolExecutor();

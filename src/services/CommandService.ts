@@ -157,5 +157,4 @@ export class CommandService {
   }
 }
 
-// Singleton instance
-export const commandService = new CommandService();
+// CommandService is now created in Config class, no singleton

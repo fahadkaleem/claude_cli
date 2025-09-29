@@ -66,6 +66,3 @@ export class ToolRegistry {
     this.registerClasses(toolClasses);
   }
 }
-
-// Singleton instance
-export const toolRegistry = new ToolRegistry();
